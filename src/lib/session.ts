@@ -6,10 +6,15 @@ const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 export type SessionPayload = { userId: string; companyId: string };
 
-function secret() {
+// Uses SESSION_SECRET when set; otherwise derives a key from DATABASE_URL, which is
+// just as private, so a fresh deploy works without extra configuration.
+async function secret() {
   const value = process.env.SESSION_SECRET;
-  if (!value || value.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters");
-  return new TextEncoder().encode(value);
+  if (value && value.length >= 32) return new TextEncoder().encode(value);
+  const fallback = process.env.DATABASE_URL;
+  if (!fallback) throw new Error("Set SESSION_SECRET (32+ characters) or DATABASE_URL");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`fluxo-session:${fallback}`));
+  return new Uint8Array(digest);
 }
 
 export async function signSession(payload: SessionPayload) {
@@ -17,13 +22,13 @@ export async function signSession(payload: SessionPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_SECONDS}s`)
-    .sign(secret());
+    .sign(await secret());
 }
 
 export async function verifySession(token: string | undefined): Promise<SessionPayload | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, await secret());
     if (typeof payload.userId !== "string" || typeof payload.companyId !== "string") return null;
     return { userId: payload.userId, companyId: payload.companyId };
   } catch {
