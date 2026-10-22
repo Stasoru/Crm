@@ -26,6 +26,15 @@ npm run dev                   # http://localhost:3000
 
 Testes e checagens: `npm test`, `npm run lint`, `npm run build`.
 
+## Publicando para teste (Vercel + Neon, grátis)
+
+1. Em vercel.com, entre com o GitHub e importe o repositório `Stasoru/Crm`.
+2. Antes de publicar, adicione as variáveis `SESSION_SECRET` (texto aleatório com 32+ caracteres) e `SEED_DEMO` = `1`.
+3. Depois do primeiro deploy, abra **Storage → Create Database → Neon** e conecte ao projeto. Isso cria o `DATABASE_URL`.
+4. Em **Deployments**, clique em **Redeploy**. O build aplica as migrações e, com `SEED_DEMO=1`, cria o login `demo@fluxo.dev` / `demo1234`.
+
+Em produção de verdade, remova `SEED_DEMO` e apague o usuário de demonstração.
+
 ## Conectando o WhatsApp
 
 1. Crie um app em developers.facebook.com com o produto WhatsApp e gere um token permanente (usuário de sistema).
