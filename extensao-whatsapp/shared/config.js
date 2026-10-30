@@ -7,7 +7,7 @@
     name: 'Fluxo Zap',
     primary: '#10a37f',
     primaryText: '#ffffff',
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   const WHATSAPP_URL = 'https://web.whatsapp.com/*';
@@ -25,7 +25,7 @@
     'sendAfterWhatsAppOpens', 'crm', 'contatos', 'notes', 'notifications', 'perfil',
     'userTabs', 'agrupamentos', 'relatorio', 'encomendas', 'autoatendimento', 'webhook',
     'IA', 'status', 'pinChat', 'atendimento', 'backupAutomatico', 'replacementStorage',
-    'FollowUp', 'fluxo', 'useNotification'
+    'FollowUp', 'fluxo', 'useNotification', 'produtos', 'vendas'
   ];
 
   const DEFAULTS = {
@@ -62,6 +62,16 @@
     replacementStorage: { items: [], isEnabled: true }, // atalhos de texto {atalho, texto}
     agrupamentos: [],              // listas de envio em massa {id, nome, contatos:[{telefone,nome}]}
     useNotification: true,
+    produtos: [],                  // catálogo {id, nome, preco, descricao, sku, imagem:{nome,tipo,dataUrl}}
+    vendas: {                      // preferências do vendedor
+      meta: 0,                     // meta de vendas do mês (R$)
+      diasParado: 3,               // lead sem movimento há X dias aparece em "Hoje"
+      esperaMin: 15,               // cliente esperando resposta há X minutos
+      chavePix: '', nomePix: '', cidadePix: '',
+      posVendaAtivo: true, posVendaDias: 3,
+      posVendaMsg: '{saudacao}, {primeiro_nome}! Seu pedido chegou direitinho? Ficou alguma dúvida? Se puder, me conta o que achou 😊',
+      barraFavoritas: true
+    },
     backupAutomatico: { date: tomorrow(), items: BACKUP_ITEMS, recurrency: 'diario', time: '10:30', ativo: false },
     initDate: false
   };

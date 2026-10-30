@@ -104,6 +104,34 @@
   const row = (...kids) => h('div', { class: 'fz-row' }, kids);
   const btn = (label, onclick, cls = '') => h('button', { class: 'fz-btn ' + cls, onclick }, label);
 
+  async function getVendas() {
+    return { ...FZ_CONFIG.DEFAULTS.vendas, ...(await S.get('vendas')) };
+  }
+
+  // Texto que o vendedor está digitando na caixa de mensagem
+  function composerText() {
+    const box = document.querySelector('footer [contenteditable="true"]');
+    return box ? box.innerText.trim() : '';
+  }
+
+  // Cria um lembrete (usado pelos atalhos +1h, amanhã etc.)
+  async function criarLembrete(chat, quando, titulo = 'Retornar contato') {
+    const nome = chat ? (await ctxOf(chat.id, chat.nome)).nome : '';
+    const iso = U.toLocalInput(quando);
+    await S.update('notifications', (l) => { l.push({ id: U.uid(), chatId: chat?.id || '', nome, titulo, date: iso.slice(0, 10), time: iso.slice(11, 16), timeOut: false, read: false }); return l; });
+    toast(`Lembrete para ${quando.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.`, 'ok');
+  }
+
+  // Valor vendido no mês: pedidos pagos/enviados/entregues + leads fechados sem pedido
+  async function vendidoNoMes() {
+    const { encomendas, crm } = await S.getMany(['encomendas', 'crm']);
+    const mes = new Date().toISOString().slice(0, 7);
+    const pagos = encomendas.filter((p) => ['pago', 'enviado', 'entregue'].includes(p.status) && (p.atualizadoEm || p.data).startsWith(mes));
+    const comPedido = new Set(pagos.map((p) => p.chatId).filter(Boolean));
+    const ganhos = crm.cards.filter((c) => c.etapaId === 'ganho' && (c.atualizadoEm || c.criadoEm || '').startsWith(mes) && !comPedido.has(c.chatId));
+    return pagos.reduce((s, p) => s + (Number(p.valor) || 0), 0) + ganhos.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+  }
+
   function beep() {
     try {
       const ctx = new AudioContext();
@@ -129,6 +157,11 @@
   document.documentElement.classList.add('fz-on');
 
   const MODULES = [];
+
+  function setStripBadge(id, n) {
+    const b = root.getElementById('fz-badge-' + id);
+    if (b) { b.textContent = n ? String(n) : ''; b.style.display = n ? '' : 'none'; }
+  }
   const reg = (id, icon, title, render) => MODULES.push({ id, icon, title, render });
 
   function openPanel(id) {
@@ -144,6 +177,8 @@
     drawerTitle.textContent = m.title;
     const scroll = drawerBody.scrollTop;
     const body = h('div', {});
+    // Aceita listas e ignora valores vazios, como o h()
+    body.append = (...kids) => Element.prototype.append.apply(body, kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false));
     try {
       await m.render(body);
     } catch (e) {
@@ -155,6 +190,92 @@
 
   /* ================================================ respostas rápidas */
 
+  /* ============================================================ hoje */
+
+  reg('hoje', '🏠', 'Meu dia', async (el) => {
+    const v = await getVendas();
+    const { notifications, FollowUp, agendamentos, crm, contatos } = await S.getMany(['notifications', 'FollowUp', 'agendamentos', 'crm', 'contatos']);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const fimDoDia = new Date(); fimDoDia.setHours(23, 59, 59, 999);
+    const abrir = (chatId) => chatId && WA.call('openChat', chatId);
+
+    // Abrir conversa com número não salvo
+    const numero = h('input', { class: 'fz-input', placeholder: 'Número com DDD (ex.: 11999999999)', onkeydown: (e) => { if (e.key === 'Enter') abrirNumero(); } });
+    const abrirNumero = async () => {
+      let d = U.onlyDigits(numero.value);
+      if (d.length === 10 || d.length === 11) d = '55' + d;
+      if (d.length < 12) return toast('Número inválido.', 'error');
+      const id = await WA.call('openNumber', d).catch(() => null);
+      if (!id) toast('Este número não tem WhatsApp.', 'error');
+    };
+    el.append(section('Chamar no WhatsApp', row(numero, btn('Abrir', abrirNumero, 'fz-btn-primary'))));
+
+    // Meta do mês
+    if (v.meta > 0) {
+      const vendido = await vendidoNoMes();
+      const pct = Math.min(100, Math.round((100 * vendido) / v.meta));
+      const dia = new Date().getDate();
+      const diasMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+      const falta = Math.max(0, v.meta - vendido);
+      const porDia = falta / Math.max(1, diasMes - dia + 1);
+      el.append(section('Meta do mês',
+        h('div', { class: 'fz-meta' }, h('b', {}, U.money(vendido)), h('small', {}, ` de ${U.money(v.meta)} (${pct}%)`)),
+        h('div', { class: 'fz-progress' }, h('div', { style: { width: pct + '%' } })),
+        h('small', { class: 'fz-help' }, falta ? `Faltam ${U.money(falta)}: cerca de ${U.money(porDia)} por dia até o fim do mês.` : 'Meta batida! 🎉')));
+    } else {
+      el.append(h('small', { class: 'fz-help' }, 'Defina sua meta de vendas do mês no Painel para acompanhar aqui.'));
+    }
+
+    // Clientes esperando resposta
+    const esperando = h('div', {}, h('div', { class: 'fz-help' }, 'Verificando conversas…'));
+    el.append(section('Esperando sua resposta', esperando));
+    WA.call('pendingReplies', 80).then((list) => {
+      const limite = Date.now() / 1000 - (Number(v.esperaMin) || 0) * 60;
+      const atrasados = list.filter((c) => c.t <= limite);
+      esperando.replaceChildren(...(atrasados.length ? atrasados.slice(0, 25).map((c) => h('div', { class: 'fz-card fz-click', onclick: () => abrir(c.id) },
+        h('div', { class: 'fz-card-head' }, h('b', {}, c.nome || U.formatPhone(c.telefone)), h('span', { class: 'fz-tag fz-tag-erro' }, U.ago(c.t))),
+        h('div', { class: 'fz-preview fz-1line' }, c.ultima))) : [empty('Ninguém esperando. 👏')]));
+      setStripBadge('hoje', atrasados.length);
+    }).catch((e) => esperando.replaceChildren(empty('Não foi possível verificar: ' + e.message)));
+
+    // Tarefas do dia
+    const lembretes = notifications.filter((n) => !n.read && `${n.date}T${n.time}` <= `${hoje}T23:59`);
+    const fus = FollowUp.filter((f) => f.status === 'pendente' && new Date(f.dueAt) <= fimDoDia);
+    const ags = agendamentos.filter((a) => a.status === 'pendente' && new Date(a.quando) <= fimDoDia);
+    const tarefa = (icon, titulo, sub, chatId, extra) => h('div', { class: 'fz-card' + (chatId ? ' fz-click' : ''), onclick: () => abrir(chatId) },
+      h('div', { class: 'fz-card-head' }, icon, ' ', h('b', {}, titulo)), sub ? h('small', {}, sub) : null, extra);
+    el.append(section(`Tarefas de hoje (${lembretes.length + fus.length + ags.length})`,
+      lembretes.map((n) => tarefa('🔔', n.titulo, `${n.time}${n.nome ? ' · ' + n.nome : ''}`, n.chatId,
+        row(btn('Feito', async (e) => { e.stopPropagation(); await bg('READ_NOTIFICATION', { id: n.id }); refresh(); }, 'fz-btn-sm'),
+          btn('Adiar 1h', async (e) => {
+            e.stopPropagation();
+            const d = U.toLocalInput(new Date(Date.now() + 3600000));
+            await S.update('notifications', (l) => { const x = l.find((i) => i.id === n.id); if (x) Object.assign(x, { date: d.slice(0, 10), time: d.slice(11, 16), timeOut: false, read: false }); return l; });
+            bg('CHECK_NOTIFICATIONS'); refresh();
+          }, 'fz-btn-sm')))),
+      fus.map((f) => tarefa('🔁', `Follow-up: ${f.nome || U.formatPhone(U.phoneFromChatId(f.chatId))}`, U.fmtDateTime(f.dueAt), f.chatId)),
+      ags.map((a) => tarefa('⏰', `Agendado: ${a.nome || U.formatPhone(U.phoneFromChatId(a.chatId))}`, U.fmtDateTime(a.quando), a.chatId)),
+      !(lembretes.length + fus.length + ags.length) ? empty('Nada pendente para hoje.') : null));
+
+    // Leads parados
+    const parados = crm.cards.filter((c) => !['ganho', 'perdido'].includes(c.etapaId) && U.daysSince(c.atualizadoEm || c.criadoEm) >= (Number(v.diasParado) || 3))
+      .sort((a, b) => (a.atualizadoEm || a.criadoEm).localeCompare(b.atualizadoEm || b.criadoEm));
+    el.append(section(`Leads parados há ${v.diasParado}+ dias (${parados.length})`,
+      parados.length ? parados.slice(0, 20).map((c) => tarefa('🧊', c.nome || U.formatPhone(c.telefone),
+        `${crm.etapas.find((e) => e.id === c.etapaId)?.nome || ''} · ${U.daysSince(c.atualizadoEm || c.criadoEm)} dia(s) sem movimento${c.valor ? ' · ' + U.money(c.valor) : ''}`, c.chatId)) : empty('Nenhum lead parado.')));
+
+    // Aniversariantes
+    const md = hoje.slice(5);
+    const aniv = contatos.filter((c) => c.aniversario && c.aniversario.slice(5) === md);
+    if (aniv.length) {
+      el.append(section('🎂 Aniversariantes de hoje', aniv.map((c) => tarefa('🎉', c.nome || U.formatPhone(c.telefone), '', c.chatId,
+        row(btn('Enviar parabéns', async (e) => {
+          e.stopPropagation();
+          try { await sendContent(c.chatId, { texto: 'Feliz aniversário, {primeiro_nome}! 🎉 Muita saúde e alegria. Preparei uma condição especial pra você hoje, quer saber?' }, await ctxOf(c.chatId, c.nome), 'manual'); toast('Parabéns enviado!', 'ok'); } catch (err) { toast(err.message, 'error'); }
+        }, 'fz-btn-sm fz-btn-primary'))))));
+    }
+  });
+
   reg('respostas', '💬', 'Respostas rápidas', async (el) => {
     const { respostasRapidas: list, categoria: cats } = await S.getMany(['respostasRapidas', 'categoria']);
     let filtro = state.respFiltro || '';
@@ -163,13 +284,18 @@
     const listBox = h('div', {});
     const draw = () => {
       const q = filtro.toLowerCase();
-      const items = list.filter((r) => (!cat || r.categoriaId === cat) &&
-        (!q || r.titulo.toLowerCase().includes(q) || (r.texto || '').toLowerCase().includes(q)));
+      const items = list.filter((r) => (!cat || (cat === '__fav' ? r.favorito : r.categoriaId === cat)) &&
+        (!q || r.titulo.toLowerCase().includes(q) || (r.texto || '').toLowerCase().includes(q) || (r.atalho || '').toLowerCase().includes(q)))
+        .sort((a, b) => (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0) || (b.uso || 0) - (a.uso || 0));
       listBox.replaceChildren(...(items.length ? items.map((r) => {
         const c = cats.find((x) => x.id === r.categoriaId);
         return h('div', { class: 'fz-card' },
           h('div', { class: 'fz-card-head' },
+            h('button', { class: 'fz-star' + (r.favorito ? ' on' : ''), title: 'Favorita (aparece na barra acima da caixa de mensagem)', onclick: async () => {
+              await S.update('respostasRapidas', (l) => { const x = l.find((i) => i.id === r.id); x.favorito = !x.favorito; return l; }); refresh();
+            } }, r.favorito ? '★' : '☆'),
             h('b', {}, r.titulo),
+            r.uso ? h('small', { class: 'fz-muted' }, `${r.uso}×`) : null,
             c ? h('span', { class: 'fz-tag', style: { background: c.cor } }, c.nome) : null,
             r.atalho ? h('span', { class: 'fz-tag fz-tag-ghost' }, r.atalho) : null),
           r.texto ? h('div', { class: 'fz-preview' }, r.texto) : null,
@@ -177,11 +303,15 @@
           row(
             btn('Enviar', async () => {
               const chat = await requireChat(); if (!chat) return;
-              try { await sendContent(chat.id, r, await ctxOf(chat.id, chat.nome), 'resposta_rapida'); toast('Enviado!', 'ok'); } catch (e) { toast(e.message, 'error'); }
+              try { await sendContent(chat.id, r, await ctxOf(chat.id, chat.nome), 'resposta_rapida'); await contarUso(r.id); toast('Enviado!', 'ok'); } catch (e) { toast(e.message, 'error'); }
             }, 'fz-btn-primary fz-btn-sm'),
             btn('Inserir', async () => {
               const chat = await requireChat(); if (!chat) return;
               await WA.call('setInputText', U.applyVars(r.texto, await ctxOf(chat.id, chat.nome)));
+              await contarUso(r.id);
+            }, 'fz-btn-sm'),
+            btn('Duplicar', async () => {
+              await S.update('respostasRapidas', (l) => { l.push({ ...structuredClone(r), id: U.uid(), titulo: r.titulo + ' (cópia)', uso: 0 }); return l; }); refresh();
             }, 'fz-btn-sm'),
             btn('Editar', () => editResposta(r), 'fz-btn-sm'),
             btn('Excluir', async () => {
@@ -196,11 +326,16 @@
       h('input', { class: 'fz-input', placeholder: 'Buscar…', value: filtro, oninput: (e) => { filtro = state.respFiltro = e.target.value; draw(); } }),
       h('div', { class: 'fz-chips' },
         h('button', { class: 'fz-chip' + (!cat ? ' active' : ''), onclick: () => { state.respCat = ''; refresh(); } }, 'Todas'),
+        h('button', { class: 'fz-chip' + (cat === '__fav' ? ' active' : ''), onclick: () => { state.respCat = '__fav'; refresh(); } }, '★ Favoritas'),
         cats.map((c) => h('button', { class: 'fz-chip' + (cat === c.id ? ' active' : ''), style: { borderColor: c.cor }, onclick: () => { state.respCat = c.id; refresh(); } }, c.nome))),
       listBox,
       h('small', { class: 'fz-help' }, 'Variáveis: {nome} {primeiro_nome} {telefone} {saudacao} {data} {hora}. Use {Oi|Olá} para variar o texto.'));
     draw();
   });
+
+  async function contarUso(id) {
+    await S.update('respostasRapidas', (l) => { const x = l.find((i) => i.id === id); if (x) x.uso = (x.uso || 0) + 1; return l; });
+  }
 
   async function editResposta(r = null) {
     const cats = await S.get('categoria');
@@ -208,6 +343,7 @@
       { name: 'titulo', label: 'Título', value: r?.titulo, required: true },
       { name: 'categoriaId', label: 'Categoria', type: 'select', value: r?.categoriaId || '', options: [['', 'Sem categoria'], ...cats.map((c) => [c.id, c.nome])] },
       { name: 'texto', label: 'Mensagem', type: 'textarea', value: r?.texto, help: 'Aceita {nome}, {saudacao} etc.' },
+      { name: 'favorito', label: '★ Favorita (aparece na barra de 1 clique acima da caixa de mensagem)', type: 'checkbox', value: r?.favorito },
       { name: 'atalho', label: 'Atalho (opcional)', value: r?.atalho, placeholder: '/preco', help: 'Digite o atalho + espaço na conversa para inserir o texto.' },
       { name: 'arquivos', label: 'Adicionar arquivos (imagem, vídeo, áudio, documento)', type: 'file', multiple: true },
       ...(r?.midias?.length ? [{ name: 'limpar', label: `Remover os ${r.midias.length} arquivo(s) atuais`, type: 'checkbox' }] : [])
@@ -216,7 +352,7 @@
     const novas = await filesToMedia(v.arquivos);
     await S.update('respostasRapidas', (list) => {
       const base = r ? list.find((x) => x.id === r.id) : { id: U.uid(), midias: [], criadoEm: new Date().toISOString() };
-      Object.assign(base, { titulo: v.titulo, categoriaId: v.categoriaId, texto: v.texto, atalho: v.atalho.trim() });
+      Object.assign(base, { titulo: v.titulo, categoriaId: v.categoriaId, texto: v.texto, atalho: v.atalho.trim(), favorito: v.favorito });
       base.midias = [...(v.limpar ? [] : base.midias || []), ...novas].slice(0, 50);
       if (!r) list.push(base);
       return list;
@@ -255,12 +391,50 @@
       h('div', { class: 'fz-avatar' }, (contato.nome || chat.nome || '?').slice(0, 1).toUpperCase()),
       h('div', {}, h('b', {}, contato.nome || chat.nome || 'Sem nome'), h('div', {}, chat.isGroup ? 'Grupo' : U.formatPhone(chat.telefone || U.phoneFromChatId(chat.id))))));
 
+    // Resumo rápido do cliente
+    const etapaAtual = crm.etapas.find((e) => e.id === card?.etapaId);
+    const comprado = pedidos.filter((p) => ['pago', 'enviado', 'entregue'].includes(p.status)).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    el.append(h('div', { class: 'fz-chips' },
+      etapaAtual ? h('span', { class: 'fz-tag', style: { background: etapaAtual.cor } }, etapaAtual.nome) : h('span', { class: 'fz-tag fz-tag-ghost' }, 'Fora do funil'),
+      card ? h('span', { class: 'fz-tag fz-tag-ghost' }, `${U.daysSince(card.atualizadoEm || card.criadoEm)} dia(s) nesta etapa`) : null,
+      comprado ? h('span', { class: 'fz-tag fz-tag-enviado' }, `Já comprou ${U.money(comprado)}`) : null,
+      (card?.etiquetas || []).map((t) => h('span', { class: 'fz-tag fz-tag-ghost' }, t))));
+
+    // Lembrete em 1 clique
+    const amanha9 = new Date(); amanha9.setDate(amanha9.getDate() + 1); amanha9.setHours(9, 0, 0, 0);
+    el.append(section('Lembrar de chamar',
+      h('div', { class: 'fz-chips' },
+        btn('+1 hora', async () => { await criarLembrete(chat, new Date(Date.now() + 3600000)); }, 'fz-btn-sm'),
+        btn('+3 horas', async () => { await criarLembrete(chat, new Date(Date.now() + 3 * 3600000)); }, 'fz-btn-sm'),
+        btn('Amanhã 9h', async () => { await criarLembrete(chat, amanha9); }, 'fz-btn-sm'),
+        btn('+3 dias', async () => { const d = new Date(amanha9); d.setDate(d.getDate() + 2); await criarLembrete(chat, d); }, 'fz-btn-sm'),
+        btn('+1 semana', async () => { const d = new Date(amanha9); d.setDate(d.getDate() + 6); await criarLembrete(chat, d); }, 'fz-btn-sm'),
+        btn('Outro…', () => novoLembrete(chat), 'fz-btn-sm'))));
+
+    // Mover de etapa com 1 clique
+    const moverPara = async (etapaId) => {
+      await S.update('crm', (c) => {
+        const now = new Date().toISOString();
+        const x = c.cards.find((i) => i.chatId === chat.id);
+        if (x) Object.assign(x, { etapaId, atualizadoEm: now });
+        else c.cards.push({ id: U.uid(), chatId: chat.id, nome: ctx.nome, telefone: ctx.telefone, etapaId, valor: '', etiquetas: [], criadoEm: now, atualizadoEm: now });
+        return c;
+      });
+      toast(`Movido para ${crm.etapas.find((e) => e.id === etapaId)?.nome}.`, 'ok');
+      refresh();
+    };
+
     // Funil
     const etapaSel = h('select', { class: 'fz-input' }, h('option', { value: '' }, 'Fora do funil'),
       crm.etapas.map((e) => h('option', { value: e.id, selected: card?.etapaId === e.id }, e.nome)));
     const valor = h('input', { class: 'fz-input', type: 'number', step: '0.01', placeholder: 'Valor (R$)', value: card?.valor ?? '' });
     const etiquetas = h('input', { class: 'fz-input', placeholder: 'Etiquetas (separe por vírgula)', value: (card?.etiquetas || []).join(', ') });
-    el.append(section('Funil (CRM)', etapaSel, row(valor), etiquetas,
+    el.append(section('Funil (CRM)',
+      h('div', { class: 'fz-chips' }, crm.etapas.map((e) => h('button', {
+        class: 'fz-chip' + (card?.etapaId === e.id ? ' active' : ''), style: { borderColor: e.cor }, onclick: () => moverPara(e.id)
+      }, e.nome))),
+      h('small', { class: 'fz-help' }, 'Clique na etapa para mover. Valor e etiquetas abaixo:'),
+      etapaSel, row(valor), etiquetas,
       row(btn('Salvar no funil', async () => {
         await S.update('crm', (c) => {
           const idx = c.cards.findIndex((x) => x.chatId === chat.id);
@@ -319,6 +493,11 @@
     const fus = FollowUp.filter((f) => f.chatId === chat.id && f.status === 'pendente');
     el.append(section('Ações',
       h('div', { class: 'fz-grid' },
+        btn('🧾 Montar orçamento', () => montarOrcamento(chat)),
+        btn('💲 Cobrar com PIX', () => cobrarPix(chat)),
+        btn('📦 Enviar produto', () => enviarProduto(chat)),
+        btn('✍️ Melhorar meu texto (IA)', () => melhorarTexto()),
+        btn('📝 Resumir conversa (IA)', () => resumirConversa(chat)),
         btn('⏰ Agendar mensagem', () => novoAgendamento(chat)),
         btn('🔔 Lembrete', () => novoLembrete(chat)),
         btn(`🔁 Follow-up${fus.length ? ` (${fus.length})` : ''}`, () => novoFollowUp(chat)),
@@ -392,6 +571,205 @@
     }
   }
 
+  async function melhorarTexto() {
+    const texto = composerText();
+    if (!texto) return toast('Escreva algo na caixa de mensagem primeiro.', 'error');
+    const t = toast('Melhorando o texto…', 'info', { sticky: true });
+    try {
+      const ia = await S.get('IA');
+      const r = await bg('AI', {
+        system: (ia.prompt ? ia.prompt + ' ' : '') + 'Você revisa mensagens de vendedores no WhatsApp. Corrija português, deixe claro, cordial e persuasivo, sem exageros, mantendo o sentido e o tamanho parecido. Responda só com a mensagem final.',
+        prompt: texto
+      });
+      t.remove();
+      await WA.call('setInputText', r.trim());
+      toast('Texto melhorado. Revise e envie.', 'ok');
+    } catch (e) { t.remove(); toast(e.message, 'error'); }
+  }
+
+  async function resumirConversa(chat) {
+    const t = toast('Resumindo a conversa…', 'info', { sticky: true });
+    try {
+      const msgs = await WA.call('getMessages', chat.id, 60);
+      const conversa = msgs.filter((m) => m.body).map((m) => `${m.fromMe ? 'Vendedor' : 'Cliente'}: ${m.body}`).join('\n');
+      const r = await bg('AI', {
+        system: 'Você ajuda vendedores. Responda em português, em tópicos curtos.',
+        prompt: `Resuma a conversa abaixo com: 1) o que o cliente quer, 2) objeções/dúvidas, 3) o que já foi combinado (preço, prazo), 4) próximo passo recomendado para fechar a venda.\n\n${conversa}`
+      });
+      t.remove();
+      await modal('Resumo da conversa', h('div', { class: 'fz-preview', style: { whiteSpace: 'pre-wrap', maxHeight: 'none' } }, r), [
+        { label: 'Fechar', value: () => true },
+        { label: 'Salvar como nota', primary: true, value: async () => {
+          await S.update('notes', (l) => { l.push({ id: U.uid(), chatId: chat.id, texto: '📝 ' + r, criadoEm: new Date().toISOString() }); return l; });
+          refresh(); return true;
+        } }
+      ]);
+    } catch (e) { t.remove(); toast(e.message, 'error'); }
+  }
+
+  /* ======================================================= catálogo */
+
+  const textoProduto = (p) => `*${p.nome}*${p.sku ? ` (cód. ${p.sku})` : ''}\n${p.descricao ? p.descricao + '\n' : ''}💰 ${U.money(p.preco)}`;
+
+  async function editProduto(p = null) {
+    const v = await form(p ? 'Editar produto' : 'Novo produto', [
+      { name: 'nome', label: 'Nome', value: p?.nome, required: true },
+      { name: 'preco', label: 'Preço (R$)', type: 'number', step: '0.01', value: p?.preco ?? '', required: true },
+      { name: 'sku', label: 'Código (opcional)', value: p?.sku },
+      { name: 'estoque', label: 'Estoque (opcional)', type: 'number', value: p?.estoque ?? '' },
+      { name: 'descricao', label: 'Descrição', type: 'textarea', rows: 3, value: p?.descricao },
+      { name: 'foto', label: p?.imagem ? 'Trocar foto' : 'Foto', type: 'file', accept: 'image/*' }
+    ]);
+    if (!v) return;
+    const [img] = await filesToMedia(v.foto);
+    await S.update('produtos', (l) => {
+      const base = p ? l.find((x) => x.id === p.id) : { id: U.uid() };
+      Object.assign(base, { nome: v.nome, preco: Number(v.preco) || 0, sku: v.sku, estoque: v.estoque, descricao: v.descricao });
+      if (img) base.imagem = img;
+      if (!p) l.push(base);
+      return l;
+    });
+    refresh();
+  }
+
+  async function enviarProdutoPara(chatId, p) {
+    if (p.imagem) await sendContent(chatId, { texto: textoProduto(p), midias: [p.imagem] }, {}, 'catalogo');
+    else await sendContent(chatId, { texto: textoProduto(p) }, {}, 'catalogo');
+  }
+
+  async function enviarProduto(chat) {
+    const produtos = await S.get('produtos');
+    if (!produtos.length) { toast('Cadastre produtos no Catálogo primeiro.', 'error'); openPanel('catalogo'); return; }
+    const v = await form('Enviar produtos', [{ name: 'ids', label: 'Produtos', type: 'multiselect', options: produtos.map((p) => [p.id, `${p.nome} - ${U.money(p.preco)}`]) }], 'Enviar');
+    if (!v?.ids?.length) return;
+    try {
+      for (const id of v.ids) { await enviarProdutoPara(chat.id, produtos.find((p) => p.id === id)); await U.sleep(900); }
+      toast('Produtos enviados.', 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  reg('catalogo', '📦', 'Catálogo de produtos', async (el) => {
+    const produtos = await S.get('produtos');
+    let q = state.catBusca || '';
+    const box = h('div', {});
+    const draw = () => box.replaceChildren(...(produtos.filter((p) => !q || p.nome.toLowerCase().includes(q.toLowerCase()) || (p.sku || '').includes(q)).map((p) => h('div', { class: 'fz-card fz-prod' },
+      p.imagem ? h('img', { src: p.imagem.dataUrl, class: 'fz-thumb' }) : h('div', { class: 'fz-thumb' }, '📦'),
+      h('div', { style: { flex: 1, minWidth: 0 } },
+        h('b', {}, p.nome), h('div', { class: 'fz-price' }, U.money(p.preco)),
+        p.estoque !== '' && p.estoque !== undefined ? h('small', {}, `Estoque: ${p.estoque}`) : null,
+        row(
+          btn('Enviar', async () => { const c = await requireChat(); if (!c) return; try { await enviarProdutoPara(c.id, p); toast('Enviado!', 'ok'); } catch (e) { toast(e.message, 'error'); } }, 'fz-btn-sm fz-btn-primary'),
+          btn('Editar', () => editProduto(p), 'fz-btn-sm'),
+          btn('×', async () => { if (await confirm(`Excluir ${p.nome}?`)) { await S.update('produtos', (l) => l.filter((x) => x.id !== p.id)); refresh(); } }, 'fz-btn-sm fz-btn-danger'))))))
+      .concat(produtos.length ? [] : [empty('Cadastre seus produtos para enviar com foto e preço em 1 clique e montar orçamentos.')]));
+    el.append(
+      row(btn('+ Produto', () => editProduto(), 'fz-btn-primary'), btn('🧾 Orçamento p/ conversa atual', async () => { const c = await requireChat(); if (c) montarOrcamento(c); })),
+      h('input', { class: 'fz-input', placeholder: 'Buscar produto…', value: q, oninput: (e) => { q = state.catBusca = e.target.value; draw(); } }),
+      box);
+    draw();
+  });
+
+  /* ===================================================== orçamento / PIX */
+
+  async function montarOrcamento(chat) {
+    const produtos = await S.get('produtos');
+    const ctx = await ctxOf(chat.id, chat.nome);
+    const linhas = produtos.map((p) => ({ p, qtd: 0 }));
+    const avulsos = [];
+    const desconto = h('input', { class: 'fz-input', type: 'number', step: '0.01', placeholder: '0' });
+    const tipoDesc = h('select', { class: 'fz-input' }, h('option', { value: 'pct' }, '% desconto'), h('option', { value: 'rs' }, 'R$ desconto'));
+    const frete = h('input', { class: 'fz-input', type: 'number', step: '0.01', placeholder: '0' });
+    const pagamento = h('input', { class: 'fz-input', placeholder: 'Ex.: PIX, cartão em até 3x' });
+    const validade = h('input', { class: 'fz-input', placeholder: 'Ex.: válido até sexta' });
+    const totalEl = h('div', { class: 'fz-total' });
+    const avulsoBox = h('div', {});
+
+    const calc = () => {
+      const itens = [...linhas.filter((l) => l.qtd > 0).map((l) => ({ nome: l.p.nome, qtd: l.qtd, preco: Number(l.p.preco) })), ...avulsos.filter((a) => a.nome && a.qtd > 0)];
+      const sub = itens.reduce((s, i) => s + i.qtd * i.preco, 0);
+      const d = Number(desconto.value) || 0;
+      const desc = tipoDesc.value === 'pct' ? (sub * d) / 100 : d;
+      const fr = Number(frete.value) || 0;
+      const total = Math.max(0, sub - desc + fr);
+      totalEl.replaceChildren(h('span', {}, `Subtotal ${U.money(sub)}`, desc ? ` · Desconto -${U.money(desc)}` : null, fr ? ` · Frete ${U.money(fr)}` : null), h('b', {}, ` = ${U.money(total)}`));
+      return { itens, sub, desc, fr, total };
+    };
+    [desconto, tipoDesc, frete].forEach((i) => i.addEventListener('input', calc));
+
+    const drawAvulsos = () => avulsoBox.replaceChildren(...avulsos.map((a, i) => row(
+      h('input', { class: 'fz-input', style: { flex: 2 }, placeholder: 'Item', value: a.nome, oninput: (e) => { a.nome = e.target.value; calc(); } }),
+      h('input', { class: 'fz-input', style: { width: '60px' }, type: 'number', value: a.qtd, oninput: (e) => { a.qtd = Number(e.target.value); calc(); } }),
+      h('input', { class: 'fz-input', style: { width: '90px' }, type: 'number', step: '0.01', placeholder: 'R$', value: a.preco || '', oninput: (e) => { a.preco = Number(e.target.value); calc(); } }),
+      btn('×', () => { avulsos.splice(i, 1); drawAvulsos(); calc(); }, 'fz-x'))));
+
+    const body = h('div', {},
+      linhas.length ? h('div', { class: 'fz-orc' }, linhas.map((l) => h('div', { class: 'fz-orc-row' },
+        h('span', { style: { flex: 1 } }, l.p.nome, h('small', {}, ' ' + U.money(l.p.preco))),
+        h('input', { class: 'fz-input', type: 'number', min: 0, value: 0, style: { width: '64px' }, oninput: (e) => { l.qtd = Number(e.target.value) || 0; calc(); } })))) : h('small', { class: 'fz-help' }, 'Sem produtos no catálogo: adicione itens avulsos.'),
+      avulsoBox,
+      btn('+ Item avulso', () => { avulsos.push({ nome: '', qtd: 1, preco: 0 }); drawAvulsos(); }, 'fz-btn-sm'),
+      row(h('label', { class: 'fz-field' }, h('span', {}, 'Desconto'), desconto), h('label', { class: 'fz-field' }, h('span', {}, 'Tipo'), tipoDesc)),
+      h('label', { class: 'fz-field' }, h('span', {}, 'Frete (R$)'), frete),
+      h('label', { class: 'fz-field' }, h('span', {}, 'Forma de pagamento'), pagamento),
+      h('label', { class: 'fz-field' }, h('span', {}, 'Validade'), validade),
+      totalEl);
+    calc();
+
+    const montarTexto = (o) => [
+      `*Orçamento para ${ctx.nome || 'você'}* 🧾`, '',
+      ...o.itens.map((i) => `• ${i.qtd}x ${i.nome} - ${U.money(i.qtd * i.preco)}`), '',
+      `Subtotal: ${U.money(o.sub)}`,
+      o.desc ? `Desconto: -${U.money(o.desc)}` : null,
+      o.fr ? `Frete: ${U.money(o.fr)}` : null,
+      `*Total: ${U.money(o.total)}*`,
+      pagamento.value ? `Pagamento: ${pagamento.value}` : null,
+      validade.value ? `_${validade.value}_` : null
+    ].filter((x) => x !== null).join('\n');
+
+    const acao = await modal('Montar orçamento', body, [
+      { label: 'Cancelar', value: () => null },
+      { label: 'Colocar na caixa', value: () => (calc().itens.length ? 'inserir' : (toast('Adicione itens.', 'error'), undefined)) },
+      { label: 'Enviar + criar pedido', primary: true, value: () => (calc().itens.length ? 'pedido' : (toast('Adicione itens.', 'error'), undefined)) }
+    ]);
+    if (!acao) return;
+    const o = calc();
+    const texto = montarTexto(o);
+    if (acao === 'inserir') { await WA.call('setInputText', texto); return; }
+    try {
+      await sendContent(chat.id, { texto }, ctx, 'orcamento');
+      await S.update('encomendas', (l) => { l.push({ id: U.uid(), chatId: chat.id, cliente: ctx.nome, itens: o.itens.map((i) => `${i.qtd}x ${i.nome} - ${U.money(i.qtd * i.preco)}`).join('\n'), valor: Number(o.total.toFixed(2)), status: 'aguardando', obs: pagamento.value, data: new Date().toISOString() }); return l; });
+      // Coloca o lead em "Proposta enviada" com o valor do orçamento
+      await S.update('crm', (c) => {
+        const now = new Date().toISOString();
+        const etapa = c.etapas.some((e) => e.id === 'proposta') ? 'proposta' : c.etapas[0]?.id;
+        const x = c.cards.find((i) => i.chatId === chat.id);
+        if (x) { if (!['ganho', 'perdido'].includes(x.etapaId)) x.etapaId = etapa; x.valor = Number(o.total.toFixed(2)); x.atualizadoEm = now; }
+        else c.cards.push({ id: U.uid(), chatId: chat.id, nome: ctx.nome, telefone: ctx.telefone, etapaId: etapa, valor: Number(o.total.toFixed(2)), etiquetas: [], criadoEm: now, atualizadoEm: now });
+        return c;
+      });
+      toast('Orçamento enviado, pedido criado e lead em "Proposta enviada".', 'ok');
+      refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function cobrarPix(chat, valorSugerido) {
+    const v = await getVendas();
+    if (!v.chavePix) { toast('Cadastre sua chave PIX no Painel (seção Vendas).', 'error'); bg('PAINEL'); return; }
+    const pedidos = (await S.get('encomendas')).filter((p) => p.chatId === chat.id && ['novo', 'aguardando'].includes(p.status));
+    const f = await form('Cobrar com PIX', [
+      { name: 'valor', label: 'Valor (R$) - deixe vazio para o cliente digitar', type: 'number', step: '0.01', value: valorSugerido ?? pedidos[pedidos.length - 1]?.valor ?? '' },
+      { name: 'descricao', label: 'Descrição (opcional)', placeholder: 'Pedido 123' }
+    ], 'Enviar cobrança');
+    if (!f) return;
+    const codigo = U.pixPayload({ chave: v.chavePix, nome: v.nomePix, cidade: v.cidadePix, valor: f.valor, descricao: f.descricao });
+    try {
+      await sendContent(chat.id, { texto: `Segue o PIX${f.valor ? ` no valor de *${U.money(f.valor)}*` : ''} 👇\n\nChave: ${v.chavePix}${v.nomePix ? `\nFavorecido: ${v.nomePix}` : ''}\n\nOu copie o código abaixo e cole no app do banco em "PIX copia e cola":` }, {}, 'cobranca');
+      await U.sleep(600);
+      await WA.call('sendText', chat.id, codigo);
+      toast('Cobrança enviada.', 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
   /* ============================================================== CRM */
 
   reg('crm', '📊', 'Funil de vendas (CRM)', async (el) => {
@@ -404,6 +782,7 @@
         h('summary', {}, h('span', { class: 'fz-dot', style: { background: e.cor } }), `${e.nome} (${cards.length})`, h('small', {}, ' ' + U.money(total))),
         cards.map((c) => h('div', { class: 'fz-card fz-click', onclick: () => WA.call('openChat', c.chatId) },
           h('b', {}, c.nome || U.formatPhone(c.telefone)), c.valor ? h('small', {}, ' · ' + U.money(c.valor)) : null,
+          h('small', { class: 'fz-muted' }, ` · ${U.daysSince(c.atualizadoEm || c.criadoEm)}d`),
           (c.etiquetas || []).length ? h('div', {}, c.etiquetas.map((t) => h('span', { class: 'fz-tag fz-tag-ghost' }, t))) : null))));
     }
   });
@@ -551,11 +930,15 @@
 
   const massa = { rodando: false, pausado: false, parar: false, log: [], feitos: 0, total: 0 };
 
+  // Aceita "11999999999" (coloca 55), remove duplicados e linhas inválidas
   function parseContatos(txt) {
+    const vistos = new Set();
     return txt.split(/\n+/).map((l) => l.trim()).filter(Boolean).map((l) => {
       const [tel, ...resto] = l.split(/[;,\t]/);
-      return { telefone: U.onlyDigits(tel), nome: resto.join(' ').trim() };
-    }).filter((c) => c.telefone.length >= 10);
+      let d = U.onlyDigits(tel);
+      if (d.length === 10 || d.length === 11) d = '55' + d;
+      return { telefone: d, nome: resto.join(' ').trim() };
+    }).filter((c) => c.telefone.length >= 12 && !vistos.has(c.telefone) && vistos.add(c.telefone));
   }
 
   reg('massa', '📢', 'Envio em massa', async (el) => {
@@ -585,7 +968,7 @@
     } }, h('option', { value: '' }, 'Importar etapa do CRM…'), crm.etapas.map((e) => h('option', { value: e.id }, e.nome)));
 
     el.append(
-      section('Contatos', row(listaSel), row(etapaSel), numeros, h('small', { class: 'fz-help' }, 'Um por linha: número com DDI e DDD; nome opcional após ";".'),
+      section('Contatos', row(listaSel), row(etapaSel), numeros, h('small', { class: 'fz-help' }, 'Um por linha: número com DDD (o 55 é colocado sozinho); nome opcional após ";". Duplicados são ignorados.'),
         row(btn('Salvar lista', async () => {
           const contatos = parseContatos(numeros.value);
           if (!contatos.length) return toast('Nenhum número válido.', 'error');
@@ -761,7 +1144,7 @@
       row(btn('+ Follow-up para conversa atual', async () => { const c = await requireChat(); if (c) novoFollowUp(c); }, 'fz-btn-primary')),
       h('small', { class: 'fz-help' }, 'Mensagem enviada automaticamente se o cliente não responder no prazo. Verificado a cada 5 minutos.'),
       list.length ? list.map((f) => h('div', { class: 'fz-card' },
-        h('div', { class: 'fz-card-head' }, h('b', {}, f.nome || U.formatPhone(U.phoneFromChatId(f.chatId))), h('span', { class: 'fz-tag fz-tag-' + f.status }, f.status)),
+        h('div', { class: 'fz-card-head' }, h('b', {}, f.nome || U.formatPhone(U.phoneFromChatId(f.chatId))), h('span', { class: 'fz-tag fz-tag-' + f.status }, f.status), f.tipo === 'pos_venda' ? h('span', { class: 'fz-tag fz-tag-ghost' }, 'pós-venda') : null),
         h('small', {}, '🕒 ', U.fmtDateTime(f.dueAt)),
         h('div', { class: 'fz-preview' }, f.mensagem),
         row(btn('Abrir conversa', () => WA.call('openChat', f.chatId), 'fz-btn-sm'),
@@ -835,7 +1218,38 @@
       else l.push({ id: U.uid(), chatId: chat?.id || '', data: new Date().toISOString(), ...v });
       return l;
     });
+    await aoMudarStatusPedido({ ...p, ...v, chatId: p?.chatId || chat?.id }, p?.status);
     refresh();
+  }
+
+  async function mudarStatusPedido(p, status) {
+    await S.update('encomendas', (l) => { const x = l.find((i) => i.id === p.id); if (x) Object.assign(x, { status, atualizadoEm: new Date().toISOString() }); return l; });
+    await aoMudarStatusPedido({ ...p, status }, p.status);
+    refresh();
+  }
+
+  // Pedido pago: lead vai para "Fechado". Pedido entregue: programa a mensagem de pós-venda.
+  async function aoMudarStatusPedido(p, anterior) {
+    if (!p.chatId || p.status === anterior) return;
+    if (p.status === 'pago') {
+      await S.update('crm', (c) => {
+        const x = c.cards.find((i) => i.chatId === p.chatId);
+        if (x && c.etapas.some((e) => e.id === 'ganho')) Object.assign(x, { etapaId: 'ganho', valor: x.valor || p.valor, atualizadoEm: new Date().toISOString() });
+        return c;
+      });
+    }
+    if (p.status === 'entregue') {
+      const v = await getVendas();
+      if (!v.posVendaAtivo) return;
+      const horas = (Number(v.posVendaDias) || 3) * 24;
+      const now = Date.now();
+      await S.update('FollowUp', (l) => {
+        l.push({ id: U.uid(), chatId: p.chatId, nome: p.cliente, mensagem: v.posVendaMsg, horas, cancelarSeResponder: false, tipo: 'pos_venda',
+          criadoEm: new Date(now).toISOString(), dueAt: new Date(now + horas * 3600000).toISOString(), status: 'pendente' });
+        return l;
+      });
+      toast(`Pós-venda programado para daqui a ${v.posVendaDias} dia(s).`, 'ok');
+    }
   }
 
   reg('pedidos', '🛒', 'Pedidos', async (el) => {
@@ -851,7 +1265,9 @@
         h('div', { class: 'fz-card-head' }, h('b', {}, p.cliente), h('span', { class: 'fz-tag fz-tag-ghost' }, STATUS_PEDIDO.find((s) => s[0] === p.status)?.[1] || p.status)),
         h('small', {}, U.fmtDateTime(p.data), ' · ', U.money(p.valor)),
         p.itens ? h('div', { class: 'fz-preview' }, p.itens) : null,
+        h('div', { class: 'fz-chips' }, STATUS_PEDIDO.map(([k, l]) => h('button', { class: 'fz-chip fz-chip-sm' + (p.status === k ? ' active' : ''), onclick: () => mudarStatusPedido(p, k) }, l))),
         row(
+          p.chatId && ['novo', 'aguardando'].includes(p.status) ? btn('💲 PIX', () => cobrarPix({ id: p.chatId, nome: p.cliente }, p.valor), 'fz-btn-sm') : null,
           p.chatId ? btn('Enviar resumo', async () => {
             const txt = `*Resumo do pedido*\n${p.itens || ''}\n\n*Total:* ${U.money(p.valor)}\n*Status:* ${STATUS_PEDIDO.find((s) => s[0] === p.status)?.[1]}${p.entrega ? `\n*Entrega:* ${p.entrega}` : ''}`;
             try { await sendContent(p.chatId, { texto: txt }, {}, 'pedido'); toast('Resumo enviado.', 'ok'); } catch (e) { toast(e.message, 'error'); }
@@ -990,7 +1406,7 @@
       if (r.data.startsWith(hoje)) t.hoje++;
       if (new Date(r.data).getTime() >= sete) t.semana++;
     }
-    const nomes = { manual: 'Envio manual', resposta_rapida: 'Respostas rápidas', agendamento: 'Agendamentos', envio_massa: 'Envio em massa', robo: 'Robô', follow_up: 'Follow-up', fluxo: 'Fluxos', status: 'Status', pedido: 'Pedidos' };
+    const nomes = { manual: 'Envio manual', resposta_rapida: 'Respostas rápidas', agendamento: 'Agendamentos', envio_massa: 'Envio em massa', robo: 'Robô', follow_up: 'Follow-up', fluxo: 'Fluxos', status: 'Status', pedido: 'Pedidos', catalogo: 'Catálogo', orcamento: 'Orçamentos', cobranca: 'Cobranças PIX' };
     const ganho = crm.cards.filter((c) => c.etapaId === 'ganho');
     el.append(
       h('div', { class: 'fz-kpis' },
@@ -1018,13 +1434,41 @@
   strip.append(h('div', { class: 'fz-logo', title: BRAND.name }, 'FZ'));
   for (const m of MODULES) {
     strip.append(h('button', { class: 'fz-ico', 'data-id': m.id, title: m.title, onclick: () => openPanel(m.id) }, m.icon,
-      m.id === 'lembretes' ? h('span', { class: 'fz-badge', id: 'fz-badge-lembretes' }) : null));
+      h('span', { class: 'fz-badge', id: 'fz-badge-' + m.id })));
   }
 
-  function setBadge(n) {
-    const b = root.getElementById('fz-badge-lembretes');
-    if (b) { b.textContent = n ? String(n) : ''; b.style.display = n ? '' : 'none'; }
+  /* ============ barra de respostas favoritas acima da caixa de mensagem */
+
+  const favbar = h('div', { class: 'fz-favbar' });
+  root.append(favbar);
+  let favoritas = [];
+  async function loadFavoritas() {
+    const [list, v] = await Promise.all([S.get('respostasRapidas'), getVendas()]);
+    favoritas = v.barraFavoritas ? list.filter((r) => r.favorito).sort((a, b) => (b.uso || 0) - (a.uso || 0)) : [];
+    favbar.replaceChildren(...favoritas.map((r) => h('button', {
+      class: 'fz-fav', title: (r.midias?.length ? 'Clique para ENVIAR (tem arquivo)\n' : 'Clique para colocar na caixa · Shift+clique envia direto\n') + (r.texto || ''),
+      onclick: async (e) => {
+        const chat = await requireChat(); if (!chat) return;
+        const ctx = await ctxOf(chat.id, chat.nome);
+        try {
+          if (r.midias?.length || e.shiftKey) { await sendContent(chat.id, r, ctx, 'resposta_rapida'); toast('Enviado!', 'ok', { ms: 1500 }); }
+          else await WA.call('setInputText', U.applyVars(r.texto, ctx));
+          await contarUso(r.id);
+        } catch (err) { toast(err.message, 'error'); }
+      }
+    }, r.midias?.length ? '📎 ' : '', r.titulo)));
+    posicionarFavbar();
   }
+  function posicionarFavbar() {
+    const footer = document.querySelector('#main footer');
+    if (!footer || !favoritas.length) { favbar.style.display = 'none'; return; }
+    const r = footer.getBoundingClientRect();
+    Object.assign(favbar.style, { display: 'flex', left: r.left + 'px', width: Math.max(0, r.width) + 'px', bottom: (innerHeight - r.top + 4) + 'px' });
+  }
+  S.onChange(['respostasRapidas', 'vendas'], loadFavoritas);
+  loadFavoritas();
+  setInterval(posicionarFavbar, 1000);
+  addEventListener('resize', posicionarFavbar);
 
   async function applyPrivacy() {
     const at = await S.get('atendimento');
@@ -1034,9 +1478,13 @@
   applyPrivacy();
 
   // Atualiza o painel aberto quando os dados mudam em outra tela (ex.: CRM completo)
-  S.onChange(['crm', 'fluxo', 'notes', 'agendamentos', 'notifications', 'encomendas', 'FollowUp', 'status'], () => {
-    const ae = root.activeElement;
-    if (state.panel && !root.querySelector('.fz-overlay') && !(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) refresh();
+  let refreshTimer;
+  S.onChange(['crm', 'fluxo', 'notes', 'agendamentos', 'notifications', 'encomendas', 'FollowUp', 'status', 'produtos'], () => {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      const ae = root.activeElement;
+      if (state.panel && state.panel !== 'massa' && !root.querySelector('.fz-overlay') && !(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) refresh();
+    }, 400);
   });
 
   /* ======================================== mensagens do service worker */
@@ -1048,7 +1496,7 @@
       case 'dispatch_timing_follow': processarFollowUps(); break;
       case 'open_chat': WA.call('openChat', msg.dados.chatId); break;
       case 'Update_Notificação': {
-        setBadge(msg.dados.tam);
+        setStripBadge('lembretes', msg.dados.tam);
         for (const n of msg.dados.dispart || []) {
           beep();
           toast(`🔔 ${n.titulo}${n.nome ? ' - ' + n.nome : ''}`, 'warn', {
@@ -1071,6 +1519,7 @@
 
   WA.on('active_chat', (chat) => {
     state.chat = chat;
+    setTimeout(posicionarFavbar, 300);
     if (state.panel === 'contato') refresh();
   });
 
@@ -1086,6 +1535,16 @@
     processarAgendamentos();
     processarStatus();
     processarFollowUps();
+    // Contador de "esperando resposta" no ícone 🏠
+    const contarEsperando = async () => {
+      try {
+        const v = await getVendas();
+        const limite = Date.now() / 1000 - (Number(v.esperaMin) || 0) * 60;
+        setStripBadge('hoje', (await WA.call('pendingReplies', 80)).filter((c) => c.t <= limite).length);
+      } catch { /* ignora */ }
+    };
+    setTimeout(contarEsperando, 5000);
+    setInterval(contarEsperando, 3 * 60000);
   } else {
     toast(`${BRAND.name}: o WhatsApp demorou para carregar. Recarregue a página.`, 'error', { sticky: true });
   }

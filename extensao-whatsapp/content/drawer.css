@@ -161,3 +161,29 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
 .fz-toast-ok { background: var(--fz-primary); }
 .fz-toast-error { background: var(--fz-danger); }
 .fz-toast-warn { background: #b45309; }
+
+/* ---- melhorias para vendedores ---- */
+.fz-muted { color: var(--fz-muted); }
+.fz-1line { white-space: nowrap; text-overflow: ellipsis; max-height: none; }
+.fz-star { border: 0; background: transparent; cursor: pointer; font-size: 16px; color: var(--fz-muted); padding: 0 2px; line-height: 1; }
+.fz-star.on { color: #f5b301; }
+.fz-chip-sm { font-size: 11px; padding: 2px 8px; }
+.fz-meta b { font-size: 18px; }
+.fz-prod { display: flex; gap: 10px; align-items: flex-start; }
+.fz-thumb { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--fz-bg2); display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
+.fz-price { color: var(--fz-primary); font-weight: 700; }
+.fz-orc { max-height: 260px; overflow-y: auto; border: 1px solid var(--fz-border); border-radius: 8px; padding: 4px 8px; margin: 6px 0; }
+.fz-orc-row { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--fz-border); }
+.fz-orc-row:last-child { border-bottom: 0; }
+.fz-orc-row small { color: var(--fz-muted); }
+.fz-total { margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--fz-bg2); }
+.fz-total b { color: var(--fz-primary); font-size: 15px; }
+.fz-favbar {
+  position: fixed; z-index: 2147482990; display: none; gap: 6px; padding: 4px 10px; overflow-x: auto;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; scrollbar-width: thin;
+}
+.fz-fav {
+  flex-shrink: 0; border: 1px solid var(--fz-border); background: var(--fz-bg); color: var(--fz-text); border-radius: 14px;
+  padding: 4px 12px; cursor: pointer; font: inherit; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+.fz-fav:hover { border-color: var(--fz-primary); color: var(--fz-primary); }

@@ -11,7 +11,37 @@
   const field = (label, input, help) => h('label', { class: 'f' }, h('span', {}, label), input, help ? h('small', { class: 'muted' }, help) : null);
 
   async function render() {
-    const d = await S.getMany(['perfil', 'IA', 'webhook', 'backupAutomatico', 'useNotification', 'sendAfterWhatsAppOpens']);
+    const d = await S.getMany(['perfil', 'IA', 'webhook', 'backupAutomatico', 'useNotification', 'sendAfterWhatsAppOpens', 'vendas']);
+    const vd = { ...DEFAULTS.vendas, ...d.vendas };
+
+    /* Vendas */
+    const meta = h('input', { type: 'number', step: '0.01', value: vd.meta || '' , placeholder: '0' });
+    const diasParado = h('input', { type: 'number', min: 1, value: vd.diasParado });
+    const esperaMin = h('input', { type: 'number', min: 0, value: vd.esperaMin });
+    const chavePix = h('input', { value: vd.chavePix, placeholder: 'CPF, CNPJ, e-mail, celular (+55...) ou chave aleatória' });
+    const nomePix = h('input', { value: vd.nomePix, placeholder: 'Nome do recebedor (como no banco)' });
+    const cidadePix = h('input', { value: vd.cidadePix, placeholder: 'Cidade' });
+    const posAtivo = h('input', { type: 'checkbox', checked: !!vd.posVendaAtivo });
+    const posDias = h('input', { type: 'number', min: 1, value: vd.posVendaDias });
+    const posMsg = h('textarea', { rows: 3 });
+    posMsg.value = vd.posVendaMsg;
+    const barra = h('input', { type: 'checkbox', checked: !!vd.barraFavoritas });
+    const vendas = h('div', { class: 'panel' }, h('h2', {}, '💰 Vendas'),
+      h('div', { class: 'row' }, field('Meta de vendas do mês (R$)', meta), field('Lead parado após (dias)', diasParado), field('Alertar cliente esperando após (min)', esperaMin)),
+      h('h3', {}, 'PIX'),
+      field('Chave PIX', chavePix, 'Usada no botão "Cobrar com PIX" para gerar o código copia e cola.'),
+      h('div', { class: 'row' }, field('Nome do recebedor', nomePix), field('Cidade', cidadePix)),
+      h('h3', {}, 'Pós-venda automático'),
+      h('label', { class: 'row' }, posAtivo, ' Quando um pedido for marcado como "Entregue", enviar mensagem de pós-venda'),
+      field('Depois de quantos dias', posDias),
+      field('Mensagem', posMsg, 'Aceita {nome}, {primeiro_nome}, {saudacao}.'),
+      h('label', { class: 'row' }, barra, ' Mostrar a barra de respostas favoritas acima da caixa de mensagem'),
+      h('button', { class: 'btn primary', onclick: async () => {
+        await S.set('vendas', { ...vd, meta: Number(meta.value) || 0, diasParado: Number(diasParado.value) || 3, esperaMin: Number(esperaMin.value) || 0,
+          chavePix: chavePix.value.trim(), nomePix: nomePix.value.trim(), cidadePix: cidadePix.value.trim(),
+          posVendaAtivo: posAtivo.checked, posVendaDias: Number(posDias.value) || 3, posVendaMsg: posMsg.value, barraFavoritas: barra.checked });
+        toast('Preferências de vendas salvas.', 'ok');
+      } }, 'Salvar'));
 
     /* Perfil */
     const nome = h('input', { value: d.perfil.nome || '', placeholder: 'Seu nome (usado pela IA)' });
@@ -117,7 +147,7 @@
         } }, 'Apagar todos os dados')),
       h('p', { class: 'muted' }, `${BRAND.name} v${chrome.runtime.getManifest().version}`));
 
-    app.replaceChildren(perfil, ia, webhook, backup, prefs);
+    app.replaceChildren(vendas, perfil, ia, webhook, backup, prefs);
   }
 
   render();

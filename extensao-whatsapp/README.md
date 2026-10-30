@@ -19,23 +19,25 @@ agendamentos, robô, envio em massa e mais. Tudo fica salvo no seu navegador
 
 | Ícone | Módulo | O que faz |
 |---|---|---|
-| 💬 | Respostas rápidas | Mensagens prontas com categorias, texto + arquivos (imagem, vídeo, áudio, PDF), botão Enviar ou Inserir, atalho opcional. |
-| 👤 | Conversa atual | Funil do contato, valor, etiquetas, dados do contato, notas, e atalhos para agendar, lembrete, follow-up, pedido, fluxo, fixar, aba, IA e transcrição de áudio. |
+| 🏠 | Meu dia | Clientes esperando sua resposta (com contador no ícone), tarefas de hoje (lembretes, follow-ups, agendamentos) com "Feito" e "Adiar 1h", leads parados há X dias, aniversariantes com "Enviar parabéns", meta do mês com quanto falta por dia e campo para chamar um número não salvo. |
+| 📦 | Catálogo | Produtos com foto, preço, código e estoque. Envie com 1 clique e use no orçamento. |
+| 💬 | Respostas rápidas | Mensagens prontas com categorias, texto + arquivos (imagem, vídeo, áudio, PDF), botão Enviar ou Inserir, atalho opcional, duplicar, contador de uso e ★ favoritas. As favoritas aparecem numa barra de 1 clique logo acima da caixa de mensagem (Shift+clique envia direto). |
+| 👤 | Conversa atual | Etapa, dias parado e quanto o cliente já comprou; mover de etapa com 1 clique; lembrete em 1 clique (+1h, +3h, amanhã 9h, +3 dias, +1 semana); dados, notas e ações: **montar orçamento** (cria pedido e move o lead para "Proposta enviada"), **cobrar com PIX copia e cola**, enviar produtos, **IA: melhorar meu texto, resumir conversa, sugerir resposta**, transcrever áudio, agendar, follow-up, fluxo, fixar e abas. |
 | 📊 | CRM | Resumo do funil por etapa. O botão "Abrir CRM completo" abre o kanban com arrastar e soltar, etapas editáveis e exportação CSV. |
 | ⏰ | Agendamentos | Mensagem, resposta rápida ou fluxo em data/hora marcada, com repetição diária/semanal/mensal. Agendamentos perdidos (WhatsApp fechado) ficam em "Não disparados". |
 | 🔔 | Lembretes | Lembretes com notificação do Chrome, som, aviso na tela e contador no ícone. |
-| 📢 | Envio em massa | Lista de números (colada, salva ou importada de uma etapa do CRM), variáveis, intervalo aleatório, pausa por lote, pausar/parar e log. |
+| 📢 | Envio em massa | Lista de números (colada, salva ou importada de uma etapa do CRM; coloca o 55 sozinho e ignora duplicados), variáveis, intervalo aleatório, pausa por lote, pausar/parar e log. |
 | 🤖 | Robô | Respostas automáticas por palavra-chave, qualquer mensagem, fora do horário, com atraso e sem repetir na mesma conversa. |
 | 🔁 | Follow-up | Envia uma mensagem se o cliente não responder em X horas (cancela se ele responder). |
 | 🧩 | Fluxos | Sequências de mensagens, arquivos, "digitando…" e pausas. Editor em página própria. |
-| 🛒 | Pedidos | Pedidos por cliente com itens, valor, status e envio do resumo no WhatsApp. |
+| 🛒 | Pedidos | Pedidos por cliente com itens, valor, status em 1 clique, cobrança PIX e envio do resumo. Pedido "Pago" move o lead para Fechado; "Entregue" programa a mensagem de pós-venda automática. |
 | 📸 | Status | Status de texto ou imagem agendado (com repetição). |
 | 📁 | Abas e fixados | Fixe quantas conversas quiser e organize conversas em abas próprias. |
 | ⌨️ | Atalhos | Digite `/pix` + espaço e o texto completo aparece. |
 | 📈 | Relatório | Mensagens enviadas por módulo (hoje, 7 dias, total, erros) e resumo do funil. |
 | ⚙️ | Configurações | Modo privacidade (desfoca conversas), backup e acesso ao Painel. |
 
-**Painel** (botão direito no ícone → Opções): perfil, IA (Gemini, ChatGPT ou Groq,
+**Painel** (botão direito no ícone → Opções): **Vendas** (meta do mês, chave PIX, dias para lead parado, tempo de espera do cliente, mensagem de pós-venda, barra de favoritas), perfil, IA (Gemini, ChatGPT ou Groq,
 com a sua chave), webhooks (n8n/Make/Zapier), backup automático, importar/exportar e apagar dados.
 
 Variáveis nas mensagens: `{nome}` `{primeiro_nome}` `{telefone}` `{saudacao}` `{data}` `{hora}`.

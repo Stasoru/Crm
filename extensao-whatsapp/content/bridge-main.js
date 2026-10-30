@@ -83,6 +83,34 @@
       return WPP.chat.openChatBottom(chatId);
     },
 
+    // Abre conversa com um número que não está salvo nos contatos
+    async openNumber(phone) {
+      const r = await WPP.contact.queryExists(phone + '@c.us');
+      if (!r) return null;
+      const id = idOf(r.wid);
+      await WPP.chat.find(id);
+      await WPP.chat.openChatBottom(id);
+      return id;
+    },
+
+    // Conversas cuja última mensagem é do cliente (ele está esperando resposta)
+    async pendingReplies(limit = 80) {
+      const chats = await WPP.chat.list({ count: limit });
+      const out = [];
+      for (const chat of chats) {
+        if (chat.isGroup || chat.id?.server === 'broadcast' || chat.id?.server === 'newsletter') continue;
+        let last = null;
+        try { last = chat.msgs?.last?.(); } catch { /* coleção não carregada */ }
+        if (!last) {
+          try { [last] = await WPP.chat.getMessages(chat.id, { count: 1 }); } catch { /* ignora */ }
+        }
+        if (!last || last.id?.fromMe) continue;
+        const m = serializeMsg(last);
+        out.push({ ...serializeChat(chat), ultima: m.body || `[${m.tipo}]`, t: m.t });
+      }
+      return out.sort((a, b) => a.t - b.t);
+    },
+
     async sendText(chatId, text) {
       const r = await WPP.chat.sendTextMessage(chatId, text, { createChat: true });
       return { id: idOf(r?.id) };

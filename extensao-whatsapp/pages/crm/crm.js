@@ -9,7 +9,8 @@
   let crm = await S.get('crm');
   let busca = '';
 
-  const save = async () => { await S.set('crm', crm); };
+  // Aplica a alteração sobre a versão mais recente salva (evita apagar mudanças feitas no WhatsApp)
+  const mutate = async (fn) => { crm = await S.update('crm', fn); render(); };
 
   function abrirConversa(chatId) {
     chrome.runtime.sendMessage({ message: 'OPEN_CHAT', chatId });
@@ -45,8 +46,7 @@
           ev.preventDefault();
           body.classList.remove('over');
           const id = ev.dataTransfer.getData('text/plain');
-          const c = crm.cards.find((x) => x.id === id);
-          if (c && c.etapaId !== e.id) { c.etapaId = e.id; c.atualizadoEm = new Date().toISOString(); await save(); render(); }
+          await mutate((d) => { const c = d.cards.find((x) => x.id === id); if (c && c.etapaId !== e.id) { c.etapaId = e.id; c.atualizadoEm = new Date().toISOString(); } return d; });
         }
       }, cards.map((c) => h('div', {
         class: 'card', draggable: 'true',
@@ -54,6 +54,7 @@
       },
         h('div', { class: 'nome' }, c.nome || 'Sem nome'),
         h('div', { class: 'tel' }, U.formatPhone(c.telefone)),
+        (() => { const dias = U.daysSince(c.atualizadoEm || c.criadoEm); return h('div', { class: 'dias' + (dias >= 3 && !['ganho', 'perdido'].includes(c.etapaId) ? ' parado' : '') }, dias ? `${dias} dia(s) nesta etapa` : 'movido hoje'); })(),
         c.valor ? h('div', { class: 'valor' }, U.money(c.valor)) : null,
         (c.etiquetas || []).length ? h('div', { class: 'tags' }, c.etiquetas.map((t) => h('span', {}, t))) : null,
         c.observacao ? h('div', { class: 'muted', style: { fontSize: '12px', marginTop: '4px' } }, c.observacao) : null,
@@ -62,7 +63,7 @@
           h('button', { class: 'btn sm', onclick: () => editCard(c) }, 'Editar'),
           h('button', { class: 'btn sm danger', onclick: async () => {
             if (!(await confirm(`Remover ${c.nome || 'lead'} do funil?`))) return;
-            crm.cards = crm.cards.filter((x) => x.id !== c.id); await save(); render();
+            await mutate((d) => { d.cards = d.cards.filter((x) => x.id !== c.id); return d; });
           } }, 'Remover')))));
 
       board.append(h('section', { class: 'col' },
@@ -83,10 +84,12 @@
     if (!v) return;
     const tel = U.onlyDigits(v.telefone);
     const data = { ...v, telefone: tel, etiquetas: v.etiquetas.split(',').map((s) => s.trim()).filter(Boolean), atualizadoEm: new Date().toISOString() };
-    if (c) Object.assign(c, data, { chatId: c.chatId || U.toChatId(tel) });
-    else crm.cards.push({ id: U.uid(), chatId: U.toChatId(tel), criadoEm: new Date().toISOString(), ...data });
-    await save();
-    render();
+    await mutate((d) => {
+      const x = c && d.cards.find((i) => i.id === c.id);
+      if (x) Object.assign(x, data, { chatId: x.chatId || U.toChatId(tel) });
+      else d.cards.push({ id: U.uid(), chatId: U.toChatId(tel), criadoEm: new Date().toISOString(), ...data });
+      return d;
+    });
   }
 
   async function editEtapas() {
@@ -104,7 +107,7 @@
       h('button', { class: 'fz-btn', onclick: () => { etapas.push({ id: U.uid(), nome: 'Nova etapa', cor: '#64748b' }); draw(); } }, '+ Etapa'));
     draw();
     const ok = await modal('Etapas do funil', box, [{ label: 'Cancelar', value: () => false }, { label: 'Salvar', primary: true, value: () => true }]);
-    if (ok) { crm.etapas = etapas; await save(); render(); }
+    if (ok) await mutate((d) => { d.etapas = etapas; return d; });
   }
 
   function exportCsv() {

@@ -102,7 +102,47 @@
     return d.toISOString();
   }
 
+  // Dias inteiros desde uma data ISO
+  function daysSince(iso) {
+    if (!iso) return 0;
+    return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  }
+
+  // "há 5 min", "há 2 h", "há 3 dias"
+  function ago(tsOrIso) {
+    const t = typeof tsOrIso === 'number' ? (tsOrIso < 1e12 ? tsOrIso * 1000 : tsOrIso) : new Date(tsOrIso).getTime();
+    const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (min < 60) return `há ${min} min`;
+    const hs = Math.round(min / 60);
+    if (hs < 24) return `há ${hs} h`;
+    return `há ${Math.round(hs / 24)} dia(s)`;
+  }
+
+  /*
+    PIX "copia e cola" (BR Code estático, padrão do Banco Central).
+    chave: CPF/CNPJ/e-mail/telefone/aleatória; valor opcional.
+  */
+  function pixPayload({ chave, nome, cidade, valor, txid = '***', descricao = '' }) {
+    const clean = (s, max) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 .\-@+]/g, '').trim().slice(0, max);
+    const f = (id, v) => id + String(v.length).padStart(2, '0') + v;
+    let mai = f('00', 'br.gov.bcb.pix') + f('01', String(chave).trim());
+    const desc = clean(descricao, 40);
+    if (desc) mai += f('02', desc);
+    let p = f('00', '01') + f('26', mai) + f('52', '0000') + f('53', '986');
+    if (Number(valor) > 0) p += f('54', Number(valor).toFixed(2));
+    p += f('58', 'BR') + f('59', clean(nome, 25) || 'RECEBEDOR') + f('60', clean(cidade, 15) || 'BRASIL');
+    p += f('62', f('05', clean(txid, 25) || '***'));
+    p += '6304';
+    let crc = 0xffff;
+    for (let i = 0; i < p.length; i++) {
+      crc ^= p.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+    }
+    return p + crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
   g.FZ_UTIL = {
+    daysSince, ago, pixPayload,
     uid, onlyDigits, toChatId, phoneFromChatId, formatPhone, saudacao, spin, applyVars,
     sleep, randInt, fmtDateTime, money, toLocalInput, fileToDataUrl, nextOccurrence
   };
