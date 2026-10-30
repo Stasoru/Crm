@@ -1,0 +1,26 @@
+/* Estilos aplicados na própria página do WhatsApp (fora do Shadow DOM) */
+
+/* Abre espaço para a barra de ícones na direita */
+html.fz-on #app {
+  width: calc(100vw - 52px) !important;
+}
+
+#fluxo-zap-root {
+  all: initial;
+}
+
+/* Modo privacidade: desfoca lista de conversas e mensagens até passar o mouse */
+html.fz-privacy #pane-side [role="listitem"],
+html.fz-privacy #pane-side [role="row"],
+html.fz-privacy #main [role="row"],
+html.fz-privacy #main header {
+  filter: blur(6px);
+  transition: filter 0.15s;
+}
+
+html.fz-privacy #pane-side [role="listitem"]:hover,
+html.fz-privacy #pane-side [role="row"]:hover,
+html.fz-privacy #main [role="row"]:hover,
+html.fz-privacy #main header:hover {
+  filter: none;
+}

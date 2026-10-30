@@ -1,0 +1,61 @@
+# Fluxo Zap - CRM para WhatsApp Web (extensão do Chrome)
+
+Extensão própria, feita do zero, que reproduz o funcionamento da extensão Waseller:
+uma barra de ferramentas dentro do WhatsApp Web com CRM, respostas rápidas,
+agendamentos, robô, envio em massa e mais. Tudo fica salvo no seu navegador
+(não depende de nenhum servidor externo).
+
+## Como instalar (5 minutos)
+
+1. Baixe o arquivo `fluxo-zap.zip` e descompacte numa pasta.
+2. No Chrome, abra `chrome://extensions`.
+3. Ligue o **Modo do desenvolvedor** (canto superior direito).
+4. Clique em **Carregar sem compactação** e escolha a pasta descompactada (a que tem o `manifest.json`).
+5. Clique no ícone verde do Fluxo Zap: o WhatsApp Web abre com a barra de ícones na direita.
+
+> Se você tiver a Waseller instalada, desative-a antes, porque as duas mexem no WhatsApp Web ao mesmo tempo.
+
+## O que a extensão faz
+
+| Ícone | Módulo | O que faz |
+|---|---|---|
+| 💬 | Respostas rápidas | Mensagens prontas com categorias, texto + arquivos (imagem, vídeo, áudio, PDF), botão Enviar ou Inserir, atalho opcional. |
+| 👤 | Conversa atual | Funil do contato, valor, etiquetas, dados do contato, notas, e atalhos para agendar, lembrete, follow-up, pedido, fluxo, fixar, aba, IA e transcrição de áudio. |
+| 📊 | CRM | Resumo do funil por etapa. O botão "Abrir CRM completo" abre o kanban com arrastar e soltar, etapas editáveis e exportação CSV. |
+| ⏰ | Agendamentos | Mensagem, resposta rápida ou fluxo em data/hora marcada, com repetição diária/semanal/mensal. Agendamentos perdidos (WhatsApp fechado) ficam em "Não disparados". |
+| 🔔 | Lembretes | Lembretes com notificação do Chrome, som, aviso na tela e contador no ícone. |
+| 📢 | Envio em massa | Lista de números (colada, salva ou importada de uma etapa do CRM), variáveis, intervalo aleatório, pausa por lote, pausar/parar e log. |
+| 🤖 | Robô | Respostas automáticas por palavra-chave, qualquer mensagem, fora do horário, com atraso e sem repetir na mesma conversa. |
+| 🔁 | Follow-up | Envia uma mensagem se o cliente não responder em X horas (cancela se ele responder). |
+| 🧩 | Fluxos | Sequências de mensagens, arquivos, "digitando…" e pausas. Editor em página própria. |
+| 🛒 | Pedidos | Pedidos por cliente com itens, valor, status e envio do resumo no WhatsApp. |
+| 📸 | Status | Status de texto ou imagem agendado (com repetição). |
+| 📁 | Abas e fixados | Fixe quantas conversas quiser e organize conversas em abas próprias. |
+| ⌨️ | Atalhos | Digite `/pix` + espaço e o texto completo aparece. |
+| 📈 | Relatório | Mensagens enviadas por módulo (hoje, 7 dias, total, erros) e resumo do funil. |
+| ⚙️ | Configurações | Modo privacidade (desfoca conversas), backup e acesso ao Painel. |
+
+**Painel** (botão direito no ícone → Opções): perfil, IA (Gemini, ChatGPT ou Groq,
+com a sua chave), webhooks (n8n/Make/Zapier), backup automático, importar/exportar e apagar dados.
+
+Variáveis nas mensagens: `{nome}` `{primeiro_nome}` `{telefone}` `{saudacao}` `{data}` `{hora}`.
+Para variar o texto use `{Oi|Olá|E aí}`.
+
+## Como funciona por dentro
+
+- `background.js`: alarmes de 1, 5 e 30 minutos (agendamentos, status, lembretes, backup, follow-up), IA, webhooks e abertura das páginas.
+- `content/bridge-main.js` + `lib/wppconnect-wa.js`: conversa com o WhatsApp Web usando a biblioteca open source [WA-JS](https://github.com/wppconnect-team/wa-js) (licença Apache-2.0), empacotada junto, sem código remoto.
+- `content/app.js`: a barra lateral e todos os módulos.
+- `pages/`: CRM completo, editor de fluxos e painel.
+- `shared/config.js`: nome, cor e dados padrão (para trocar a marca, mude aqui e os ícones em `icons/`).
+
+## O que ficou de fora (dependia dos servidores da Wascript)
+
+Login/licença pelo painel deles, configuração remota de seletores, API oficial da Meta,
+multiatendimento por servidor, "Meet ao vivo", pixel e páginas promocionais.
+A transcrição de áudio, que lá usa o servidor deles, aqui usa a sua chave de IA.
+
+## Avisos
+
+- O WhatsApp não permite automações oficialmente. Envio em massa para quem não conhece você pode bloquear o número; use intervalos longos.
+- Os dados ficam só neste navegador. Ligue o backup automático no Painel.

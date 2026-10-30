@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRM - Fluxo Zap</title>
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="crm.css">
+</head>
+<body>
+  <header class="top">
+    <div class="logo">FZ</div>
+    <h1>Funil de vendas</h1>
+    <input id="busca" placeholder="Buscar nome, telefone ou etiqueta…">
+    <button class="btn" id="novoCard">+ Lead</button>
+    <button class="btn" id="etapas">Etapas</button>
+    <button class="btn" id="csv">Exportar CSV</button>
+    <nav><a href="../crm/index.html" class="active">CRM</a><a href="../fluxo/index.html">Fluxos</a><a href="../painel/index.html">Painel</a></nav>
+  </header>
+  <div id="resumo" class="resumo"></div>
+  <main id="board" class="board"></main>
+  <script src="../../shared/config.js"></script>
+  <script src="../../shared/storage.js"></script>
+  <script src="../../shared/util.js"></script>
+  <script src="../../content/ui.js"></script>
+  <script src="crm.js"></script>
+</body>
+</html>

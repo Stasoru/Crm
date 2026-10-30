@@ -1,0 +1,29 @@
+:root {
+  --primary: #10a37f; --bg: #f4f6f8; --card: #ffffff; --text: #111b21; --muted: #667781; --border: #e2e8f0; --danger: #e5484d;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0b141a; --card: #111b21; --text: #e9edef; --muted: #8696a0; --border: #2a3942; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+header.top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header.top .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; }
+header.top h1 { font-size: 18px; margin: 0; flex: 1; }
+header.top nav a { color: var(--muted); text-decoration: none; margin-left: 14px; }
+header.top nav a.active, header.top nav a:hover { color: var(--primary); font-weight: 600; }
+main { padding: 20px; }
+.btn { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+.btn:hover { filter: brightness(.96); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.danger { color: var(--danger); }
+.btn.sm { padding: 4px 9px; font-size: 12px; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+.muted { color: var(--muted); }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; max-width: 860px; }
+.panel h2 { margin: 0 0 10px; font-size: 16px; }
+label.f { display: block; margin: 10px 0; }
+label.f > span { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+label.f input:not([type=checkbox]), label.f select, label.f textarea { width: 100%; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

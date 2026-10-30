@@ -1,0 +1,18 @@
+.board { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; min-height: calc(100vh - 130px); }
+.col { flex: 0 0 290px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 150px); }
+.col-head { padding: 12px 14px; border-bottom: 3px solid; }
+.col-head b { font-size: 14px; }
+.col-head small { display: block; color: var(--muted); margin-top: 2px; }
+.col-body { padding: 8px; overflow-y: auto; min-height: 80px; flex: 1; }
+.col-body.over { background: rgba(16, 163, 127, .08); }
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: grab; }
+.card:hover { border-color: var(--primary); }
+.card .nome { font-weight: 600; }
+.card .tel { color: var(--muted); font-size: 12px; }
+.card .valor { color: var(--primary); font-weight: 700; margin-top: 4px; }
+.card .tags span { display: inline-block; font-size: 11px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; margin: 4px 4px 0 0; }
+.card .acoes { display: flex; gap: 6px; margin-top: 8px; }
+.resumo { display: flex; gap: 12px; padding: 14px 20px 0; flex-wrap: wrap; }
+.resumo div { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; }
+.resumo b { display: block; font-size: 16px; }
+#busca { min-width: 240px; }
