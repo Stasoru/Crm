@@ -1523,6 +1523,7 @@
       case 'Update_Agendamento': processarAgendamentos(); break;
       case 'Update_Status': processarStatus(); break;
       case 'dispatch_timing_follow': processarFollowUps(); break;
+      case 'sync_conversas': syncConversas(); break;
       case 'open_chat': WA.call('openChat', msg.dados.chatId); break;
       case 'Update_Notificação': {
         setStripBadge('lembretes', msg.dados.tam);
@@ -1552,8 +1553,25 @@
     if (state.panel === 'contato') refresh();
   });
 
+  // Copia a lista de conversas do WhatsApp para o kanban do CRM (ordem: mais recente primeiro)
+  let syncTimer;
+  async function syncConversas() {
+    if (!WA.isReady() || state.busy.sync) return;
+    state.busy.sync = true;
+    try {
+      const lista = await WA.call('chatsForCrm', 1000);
+      await S.set('conversas', { atualizadoEm: new Date().toISOString(), lista });
+    } catch (e) {
+      console.warn('[Beco WppSeller] Falha ao sincronizar conversas', e);
+    } finally {
+      state.busy.sync = false;
+    }
+  }
+  const syncEmBreve = () => { clearTimeout(syncTimer); syncTimer = setTimeout(syncConversas, 4000); };
+
   WA.on('new_message', (msg) => {
     if (!msg || !msg.chatId || msg.chatId.endsWith('@broadcast') || msg.chatId.endsWith('@newsletter')) return;
+    syncEmBreve();
     if (temWebhook) bg('WEBHOOK', { evento: msg.fromMe ? 'mensagem_enviada' : 'mensagem_recebida', payload: msg }).catch(() => {});
     if (!msg.fromMe) roboOnMessage(msg);
   });
@@ -1564,6 +1582,7 @@
     processarAgendamentos();
     processarStatus();
     processarFollowUps();
+    syncConversas();
     // Contador de "esperando resposta" no ícone 🏠
     const contarEsperando = async () => {
       try {

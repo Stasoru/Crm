@@ -82,6 +82,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     case 'One_Minute':
       broadcastToWhatsApp('Update_Agendamento');
       broadcastToWhatsApp('Update_Status');
+      broadcastToWhatsApp('sync_conversas');
       await checkNotifications();
       await checkAutoBackup();
       break;
@@ -297,6 +298,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       case 'TRANSCRIBE': return transcribe(msg);
       case 'WEBHOOK': return sendWebhook(msg.evento, msg.payload);
       case 'BACKUP_NOW': return downloadBackup(msg.items);
+      case 'SYNC_CHATS': {
+        const tabs = await chrome.tabs.query({ url: WHATSAPP_URL });
+        for (const t of tabs) chrome.tabs.sendMessage(t.id, { action: 'sync_conversas', dados: {} }).catch(() => {});
+        return tabs.length > 0;
+      }
       case 'CHECK_NOTIFICATIONS': return checkNotifications();
       case 'READ_NOTIFICATION': {
         const list = await S.get('notifications');

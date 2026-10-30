@@ -112,6 +112,7 @@
   function ago(tsOrIso) {
     const t = typeof tsOrIso === 'number' ? (tsOrIso < 1e12 ? tsOrIso * 1000 : tsOrIso) : new Date(tsOrIso).getTime();
     const min = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (min < 1) return 'agora mesmo';
     if (min < 60) return `há ${min} min`;
     const hs = Math.round(min / 60);
     if (hs < 24) return `há ${hs} h`;

@@ -12,12 +12,15 @@
     <img class="logo" src="../../icons/logo-beco.svg" alt="Beco Diagonal"><span class="produto">WppSeller</span>
     <h1>Funil de vendas</h1>
     <input id="busca" placeholder="Buscar nome, telefone ou etiqueta…">
+    <label class="toggle"><input type="checkbox" id="grupos"> Grupos</label>
+    <button class="btn" id="sync" title="Buscar as conversas do WhatsApp agora">↻ Atualizar conversas</button>
     <button class="btn" id="novoCard">+ Lead</button>
     <button class="btn" id="etapas">Etapas</button>
     <button class="btn" id="csv">Exportar CSV</button>
     <nav><a href="../crm/index.html" class="active">CRM</a><a href="../fluxo/index.html">Fluxos</a><a href="../painel/index.html">Painel</a></nav>
   </header>
   <div id="resumo" class="resumo"></div>
+  <div id="aviso" class="aviso"></div>
   <main id="board" class="board"></main>
   <script src="../../shared/config.js"></script>
   <script src="../../shared/storage.js"></script>

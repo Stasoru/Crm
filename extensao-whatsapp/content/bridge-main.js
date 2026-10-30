@@ -93,6 +93,21 @@
       return id;
     },
 
+    // Todas as conversas com a última mensagem, para o kanban do CRM
+    async chatsForCrm(limit = 1000) {
+      const chats = await WPP.chat.list({ count: limit });
+      const out = [];
+      for (const chat of chats) {
+        const server = chat.id?.server;
+        if (server === 'broadcast' || server === 'newsletter') continue;
+        let last = null;
+        try { last = chat.msgs?.last?.(); } catch { /* coleção não carregada */ }
+        const m = last ? serializeMsg(last) : null;
+        out.push({ ...serializeChat(chat), ultima: m ? (m.body || `[${m.tipo}]`) : '', fromMe: m ? m.fromMe : false, t: (m && m.t) || chat.t || 0 });
+      }
+      return out.sort((a, b) => b.t - a.t);
+    },
+
     // Conversas cuja última mensagem é do cliente (ele está esperando resposta)
     async pendingReplies(limit = 80) {
       const chats = await WPP.chat.list({ count: limit });

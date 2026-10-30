@@ -7,7 +7,7 @@
     name: 'Beco WppSeller',
     primary: '#EFA528',
     primaryText: '#1a1206',
-    version: '1.2.0'
+    version: '1.3.0'
   };
 
   const WHATSAPP_URL = 'https://web.whatsapp.com/*';
@@ -62,6 +62,7 @@
     replacementStorage: { items: [], isEnabled: true }, // atalhos de texto {atalho, texto}
     agrupamentos: [],              // listas de envio em massa {id, nome, contatos:[{telefone,nome}]}
     useNotification: true,
+    conversas: { atualizadoEm: null, lista: [] }, // cópia da lista de conversas do WhatsApp para o kanban
     produtos: [],                  // catálogo {id, nome, preco, descricao, sku, imagem:{nome,tipo,dataUrl}}
     vendas: {                      // preferências do vendedor
       meta: 0,                     // meta de vendas do mês (R$)
