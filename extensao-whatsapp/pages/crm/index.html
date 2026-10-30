@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRM - Beco WppSeller</title>
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="crm.css">
+</head>
+<body>
+  <header class="top">
+    <img class="logo" src="../../icons/logo-beco.svg" alt="Beco Diagonal"><span class="produto">WppSeller</span>
+    <h1>Funil</h1>
+    <input id="busca" placeholder="Buscar…">
+    <label class="toggle" title="Mostrar conversas de grupos"><input type="checkbox" id="grupos"> Grupos</label>
+    <button class="btn sm" id="sync" title="Buscar as conversas do WhatsApp agora">↻</button>
+    <button class="btn sm" id="novoCard" title="Adicionar lead manualmente">+ Lead</button>
+    <button class="btn sm" id="etapas" title="Criar, renomear, ordenar e colorir etapas">Etapas</button>
+    <button class="btn sm" id="csv" title="Exportar leads em CSV">CSV</button>
+    <nav><a href="../crm/index.html" class="active">CRM</a><a href="../fluxo/index.html">Fluxos</a><a href="../painel/index.html">Painel</a></nav>
+  </header>
+  <div id="resumo" class="resumo"></div>
+  <main id="board" class="board"></main>
+  <script src="../../shared/config.js"></script>
+  <script src="../../shared/storage.js"></script>
+  <script src="../../shared/util.js"></script>
+  <script src="../../content/ui.js"></script>
+  <script src="crm.js"></script>
+</body>
+</html>

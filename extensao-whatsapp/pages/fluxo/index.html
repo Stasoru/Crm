@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fluxos - Beco WppSeller</title>
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="fluxo.css">
+</head>
+<body>
+  <header class="top">
+    <img class="logo" src="../../icons/logo-beco.svg" alt="Beco Diagonal"><span class="produto">WppSeller</span>
+    <h1>Fluxos de mensagens</h1>
+    <nav><a href="../crm/index.html">CRM</a><a href="../fluxo/index.html" class="active">Fluxos</a><a href="../painel/index.html">Painel</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="lista">
+      <button class="btn primary" id="novo" style="width:100%">+ Novo fluxo</button>
+      <div id="lista"></div>
+    </aside>
+    <section id="editor" class="editor"></section>
+  </main>
+  <script src="../../shared/config.js"></script>
+  <script src="../../shared/storage.js"></script>
+  <script src="../../shared/util.js"></script>
+  <script src="../../content/ui.js"></script>
+  <script src="fluxo.js"></script>
+</body>
+</html>
