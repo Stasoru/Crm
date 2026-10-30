@@ -43,15 +43,6 @@
     return hoje ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  function ultimaLinha(conv) {
-    if (!conv) return null;
-    return h('div', { class: 'ultima' },
-      h('span', { class: 'quando' }, horaMsg(conv.t)),
-      conv.naoLidas ? h('span', { class: 'naolidas' }, conv.naoLidas) : null,
-      h('span', { class: 'txt' }, (conv.fromMe ? 'Você: ' : '') + (conv.ultima || '')));
-  }
-
-  // Solta um item (lead ou conversa) numa etapa; etapaId vazio = volta para "Conversas"
   async function soltar(data, etapaId) {
     const [tipo, id] = [data.slice(0, data.indexOf(':')), data.slice(data.indexOf(':') + 1)];
     const now = new Date().toISOString();
@@ -84,75 +75,77 @@
     return body;
   }
 
+  // Cartão compacto: nome + hora na 1ª linha, última mensagem na 2ª, valor/dias só se houver
+  function cartao({ dragData, nome, conv, valor, dias, parado, chatId, onEdit }) {
+    const nao = conv?.naoLidas || 0;
+    return h('div', {
+      class: 'card' + (nao ? ' nova' : ''), draggable: 'true', title: 'Clique para abrir no WhatsApp · arraste para mudar de etapa',
+      ondragstart: (ev) => ev.dataTransfer.setData('text/plain', dragData),
+      onclick: () => chatId && abrirConversa(chatId)
+    },
+      h('div', { class: 'l1' }, h('span', { class: 'nome' }, nome), h('span', { class: 'hora' }, horaMsg(conv?.t))),
+      h('div', { class: 'l2' },
+        h('span', { class: 'txt' }, conv ? (conv.fromMe ? 'Você: ' : '') + (conv.ultima || '') : ''),
+        nao ? h('span', { class: 'nao' }, nao) : null),
+      valor || dias ? h('div', { class: 'l3' },
+        valor ? h('span', { class: 'valor' }, U.money(valor)) : null,
+        dias ? h('span', { class: 'dias' + (parado ? ' parado' : '') }, `${dias}d`) : null) : null,
+      onEdit ? h('button', { class: 'edit', title: 'Editar', onclick: (e) => { e.stopPropagation(); onEdit(); } }, '✎') : null);
+  }
+
+  function coluna({ titulo, cor, qtd, total, etapaId, cards, inbox }) {
+    const body = dropZone(etapaId);
+    body.append(...cards);
+    if (!cards.length) body.append(h('div', { class: 'vazio' }, inbox ? 'Nenhuma conversa' : 'Solte aqui'));
+    const col = h('section', { class: 'col' + (inbox ? ' inbox' : '') },
+      h('div', { class: 'col-head' },
+        h('span', { class: 'titulo' }, titulo), h('span', { class: 'qtd' }, qtd),
+        total ? h('span', { class: 'total' }, U.money(total)) : null),
+      body);
+    col.style.setProperty('--cor', cor);
+    return col;
+  }
+
   function render() {
     const board = $('#board');
-    board.replaceChildren();
     const idx = indexConversas();
     const ganhos = crm.cards.filter((c) => c.etapaId === 'ganho');
     const totalAberto = crm.cards.filter((c) => !['ganho', 'perdido'].includes(c.etapaId)).reduce((s, c) => s + (Number(c.valor) || 0), 0);
     const conv = crm.cards.length ? Math.round((100 * ganhos.length) / crm.cards.length) : 0;
     $('#resumo').replaceChildren(
-      h('div', {}, h('b', {}, crm.cards.length), h('span', { class: 'muted' }, 'leads no funil')),
-      h('div', {}, h('b', {}, U.money(totalAberto)), h('span', { class: 'muted' }, 'em negociação')),
-      h('div', {}, h('b', {}, U.money(ganhos.reduce((s, c) => s + (Number(c.valor) || 0), 0))), h('span', { class: 'muted' }, 'fechado')),
-      h('div', {}, h('b', {}, conv + '%'), h('span', { class: 'muted' }, 'conversão')));
-    $('#aviso').replaceChildren(atualizado
-      ? h('span', { class: 'muted' }, `Conversas do WhatsApp atualizadas ${U.ago(atualizado)} · ${conversas.length} conversa(s). Arraste qualquer cartão para a etapa desejada.`)
-      : h('span', {}, 'Abra o WhatsApp Web com a extensão ligada para as conversas aparecerem aqui automaticamente.'));
+      h('span', {}, h('b', {}, crm.cards.length), ' no funil'),
+      h('span', {}, h('b', {}, U.money(totalAberto)), ' em negociação'),
+      h('span', {}, h('b', {}, U.money(ganhos.reduce((s, c) => s + (Number(c.valor) || 0), 0))), ' fechado'),
+      h('span', {}, h('b', {}, conv + '%'), ' conversão'),
+      h('span', { class: 'sync' }, atualizado ? `WhatsApp sincronizado ${U.ago(atualizado)}` : 'Abra o WhatsApp Web para puxar as conversas'));
 
-    // Coluna 1: todas as conversas que ainda não estão no funil, da mais recente para a mais antiga
     const noFunilId = new Set(crm.cards.map((c) => c.chatId));
     const noFunilTel = new Set(crm.cards.map((c) => c.telefone).filter(Boolean));
     const inbox = conversas.filter((c) => (mostrarGrupos || !c.isGroup) && !noFunilId.has(c.id) && !(c.telefone && noFunilTel.has(c.telefone)) && filtrar(c));
-    const inboxBody = dropZone('');
-    inboxBody.append(...inbox.slice(0, limiteInbox).map((c) => h('div', {
-      class: 'card conversa' + (c.naoLidas ? ' nova' : ''), draggable: 'true',
-      ondragstart: (ev) => ev.dataTransfer.setData('text/plain', 'chat:' + c.id)
-    },
-      h('div', { class: 'linha' }, h('div', { class: 'nome' }, c.isGroup ? '👥 ' : '', c.nome || U.formatPhone(c.telefone) || 'Sem nome')),
-      c.telefone && c.nome ? h('div', { class: 'tel' }, U.formatPhone(c.telefone)) : null,
-      ultimaLinha(c),
-      h('div', { class: 'acoes' },
-        h('button', { class: 'btn sm primary', onclick: () => abrirConversa(c.id) }, 'WhatsApp'),
-        h('select', { class: 'mover', onchange: async (e) => { if (e.target.value) await soltar('chat:' + c.id, e.target.value); } },
-          h('option', { value: '' }, 'Mover para…'), crm.etapas.map((e) => h('option', { value: e.id }, e.nome)))))));
-    if (inbox.length > limiteInbox) inboxBody.append(h('button', { class: 'btn sm', style: { width: '100%' }, onclick: () => { limiteInbox += 150; render(); } }, `Mostrar mais (${inbox.length - limiteInbox})`));
-    if (!inbox.length) inboxBody.append(h('p', { class: 'muted', style: { textAlign: 'center' } }, conversas.length ? 'Todas as conversas já estão no funil.' : 'Nenhuma conversa sincronizada ainda.'));
-    board.append(h('section', { class: 'col inbox' },
-      h('div', { class: 'col-head', style: { borderColor: 'var(--primary)' } }, h('b', {}, 'Conversas'), h('small', {}, `${inbox.length} fora do funil · mais recentes primeiro`)),
-      inboxBody));
+    const inboxCards = inbox.slice(0, limiteInbox).map((c) => cartao({
+      dragData: 'chat:' + c.id, nome: c.nome || U.formatPhone(c.telefone) || 'Sem nome', conv: c, chatId: c.id
+    }));
+    if (inbox.length > limiteInbox) inboxCards.push(h('button', { class: 'mais', onclick: () => { limiteInbox += 150; render(); } }, `+ ${inbox.length - limiteInbox} conversas`));
 
-    // Etapas do funil
+    const cols = [coluna({ titulo: 'Conversas', cor: 'var(--primary)', qtd: inbox.length, etapaId: '', cards: inboxCards, inbox: true })];
     for (const e of crm.etapas) {
-      const cards = crm.cards.filter((c) => c.etapaId === e.id && filtrar({ ...c, ultima: idx.de(c)?.ultima }))
-        .map((c) => ({ c, conv: idx.de(c) }))
-        .sort((a, b) => (b.conv?.t || new Date(b.c.atualizadoEm || 0).getTime() / 1000) - (a.conv?.t || new Date(a.c.atualizadoEm || 0).getTime() / 1000));
-      const total = cards.reduce((s, x) => s + (Number(x.c.valor) || 0), 0);
-      const body = dropZone(e.id);
-      body.append(...cards.map(({ c, conv: cv }) => h('div', {
-        class: 'card' + (cv?.naoLidas ? ' nova' : ''), draggable: 'true',
-        ondragstart: (ev) => ev.dataTransfer.setData('text/plain', 'card:' + c.id)
-      },
-        h('div', { class: 'nome' }, c.nome || cv?.nome || 'Sem nome'),
-        h('div', { class: 'tel' }, U.formatPhone(c.telefone)),
-        ultimaLinha(cv),
-        (() => { const dias = U.daysSince(c.atualizadoEm || c.criadoEm); return h('div', { class: 'dias' + (dias >= 3 && !['ganho', 'perdido'].includes(c.etapaId) ? ' parado' : '') }, dias ? `${dias} dia(s) nesta etapa` : 'movido hoje'); })(),
-        c.valor ? h('div', { class: 'valor' }, U.money(c.valor)) : null,
-        (c.etiquetas || []).length ? h('div', { class: 'tags' }, c.etiquetas.map((t) => h('span', {}, t))) : null,
-        c.observacao ? h('div', { class: 'muted', style: { fontSize: '12px', marginTop: '4px' } }, c.observacao) : null,
-        h('div', { class: 'acoes' },
-          c.chatId ? h('button', { class: 'btn sm primary', onclick: () => abrirConversa(c.chatId) }, 'WhatsApp') : null,
-          h('button', { class: 'btn sm', onclick: () => editCard(c) }, 'Editar'),
-          h('button', { class: 'btn sm danger', title: 'Tirar do funil (volta para Conversas)', onclick: async () => {
-            if (!(await confirm(`Tirar ${c.nome || 'lead'} do funil? A conversa volta para a coluna Conversas.`))) return;
-            await mutate((d) => { d.cards = d.cards.filter((x) => x.id !== c.id); return d; });
-          } }, 'Remover')))));
-      if (!cards.length) body.append(h('p', { class: 'muted vazio' }, 'Arraste conversas para cá'));
-
-      board.append(h('section', { class: 'col' },
-        h('div', { class: 'col-head', style: { borderColor: e.cor } }, h('b', {}, e.nome), h('small', {}, `${cards.length} lead(s) · ${U.money(total)}`)),
-        body));
+      const itens = crm.cards.filter((c) => c.etapaId === e.id && filtrar({ ...c, ultima: idx.de(c)?.ultima }))
+        .map((c) => ({ c, cv: idx.de(c) }))
+        .sort((a, b) => (b.cv?.t || new Date(b.c.atualizadoEm || 0).getTime() / 1000) - (a.cv?.t || new Date(a.c.atualizadoEm || 0).getTime() / 1000));
+      const total = itens.reduce((s, x) => s + (Number(x.c.valor) || 0), 0);
+      cols.push(coluna({
+        titulo: e.nome, cor: e.cor, qtd: itens.length, total, etapaId: e.id,
+        cards: itens.map(({ c, cv }) => {
+          const dias = U.daysSince(c.atualizadoEm || c.criadoEm);
+          return cartao({
+            dragData: 'card:' + c.id, nome: c.nome || cv?.nome || U.formatPhone(c.telefone) || 'Sem nome', conv: cv, chatId: c.chatId,
+            valor: Number(c.valor) || 0, dias, parado: dias >= 3 && !['ganho', 'perdido'].includes(c.etapaId), onEdit: () => editCard(c)
+          });
+        })
+      }));
     }
+    board.style.setProperty('--ncols', cols.length);
+    board.replaceChildren(...cols);
   }
 
   async function editCard(c = null) {
@@ -162,9 +155,12 @@
       { name: 'etapaId', label: 'Etapa', type: 'select', value: c?.etapaId || crm.etapas[0]?.id, options: crm.etapas.map((e) => [e.id, e.nome]) },
       { name: 'valor', label: 'Valor (R$)', type: 'number', step: '0.01', value: c?.valor ?? '' },
       { name: 'etiquetas', label: 'Etiquetas (separe por vírgula)', value: (c?.etiquetas || []).join(', ') },
-      { name: 'observacao', label: 'Observação', type: 'textarea', rows: 3, value: c?.observacao }
+      { name: 'observacao', label: 'Observação', type: 'textarea', rows: 3, value: c?.observacao },
+      ...(c ? [{ name: 'tirar', label: 'Tirar do funil (volta para Conversas)', type: 'checkbox' }] : [])
     ]);
     if (!v) return;
+    if (v.tirar) { await mutate((d) => { d.cards = d.cards.filter((x) => x.id !== c.id); return d; }); return; }
+    delete v.tirar;
     const tel = U.onlyDigits(v.telefone);
     const data = { ...v, telefone: tel, etiquetas: v.etiquetas.split(',').map((s) => s.trim()).filter(Boolean), atualizadoEm: new Date().toISOString() };
     await mutate((d) => {

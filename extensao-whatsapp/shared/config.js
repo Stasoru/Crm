@@ -7,7 +7,7 @@
     name: 'Beco WppSeller',
     primary: '#EFA528',
     primaryText: '#1a1206',
-    version: '1.3.0'
+    version: '1.3.1'
   };
 
   const WHATSAPP_URL = 'https://web.whatsapp.com/*';
