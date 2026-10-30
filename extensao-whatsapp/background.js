@@ -1,5 +1,5 @@
 /*
-  Service worker do Fluxo Zap.
+  Service worker do Beco WppSeller.
 
   - Alarmes de 1, 5 e 30 minutos que acordam a aba do WhatsApp para disparar
     agendamentos, status, follow-ups e lembretes.
@@ -161,7 +161,7 @@ async function downloadBackup(items) {
   const json = JSON.stringify(await buildBackup(items));
   const url = 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(json)));
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  await chrome.downloads.download({ url, filename: `fluxo-zap-backup-${stamp}.json`, saveAs: false });
+  await chrome.downloads.download({ url, filename: `beco-wppseller-backup-${stamp}.json`, saveAs: false });
 }
 
 async function checkAutoBackup() {
@@ -172,7 +172,7 @@ async function checkAutoBackup() {
   try {
     await downloadBackup(cfg.items);
   } catch (e) {
-    console.error('[Fluxo Zap] Falha no backup automático', e);
+    console.error('[Beco WppSeller] Falha no backup automático', e);
   }
   // Calcula a próxima data a partir de hoje
   const next = new Date();
@@ -279,7 +279,7 @@ async function sendWebhook(evento, payload) {
         body: JSON.stringify({ evento, enviadoEm: new Date().toISOString(), dados: payload })
       });
     } catch (e) {
-      console.warn('[Fluxo Zap] Webhook falhou', h.url, e);
+      console.warn('[Beco WppSeller] Webhook falhou', h.url, e);
     }
   }));
 }

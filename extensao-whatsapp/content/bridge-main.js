@@ -12,7 +12,7 @@
   const WPP = window.WPP;
 
   if (!WPP) {
-    console.error('[Fluxo Zap] WA-JS não carregou');
+    console.error('[Beco WppSeller] WA-JS não carregou');
     return;
   }
 
@@ -151,7 +151,7 @@
     },
 
     async sendTextStatus(text, color) {
-      await WPP.status.sendTextStatus(text, { backgroundColor: color || '#10a37f', font: 1 });
+      await WPP.status.sendTextStatus(text, { backgroundColor: color || '#EFA528', font: 1 });
       return true;
     },
 

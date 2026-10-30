@@ -1,17 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Fluxo Zap - CRM para WhatsApp Web",
-  "short_name": "Fluxo Zap",
-  "version": "1.1.0",
+  "name": "Beco WppSeller - CRM de vendas para WhatsApp Web",
+  "short_name": "Beco WppSeller",
+  "version": "1.2.0",
   "description": "CRM para WhatsApp Web: respostas rápidas, agendamentos, funil (CRM), lembretes, envio em massa, robô de atendimento, follow-up, fluxos, IA e backup.",
   "icons": {
     "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_icon": "icons/icon128.png",
-    "default_title": "Abrir WhatsApp Web com o Fluxo Zap"
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Abrir o WhatsApp Web com o Beco WppSeller"
   },
   "options_page": "pages/painel/index.html",
   "background": {
@@ -56,6 +61,7 @@
         "shared/storage.js",
         "shared/util.js",
         "content/bridge.js",
+        "shared/icons.js",
         "content/ui.js",
         "content/app.js"
       ],
@@ -72,7 +78,8 @@
       ],
       "resources": [
         "content/drawer.css",
-        "icons/*.png"
+        "icons/*.png",
+        "icons/*.svg"
       ]
     }
   ]

@@ -1,4 +1,4 @@
-# Fluxo Zap - CRM para WhatsApp Web (extensão do Chrome)
+# Beco WppSeller - CRM de vendas para WhatsApp Web (extensão do Chrome)
 
 Extensão própria, feita do zero, que reproduz o funcionamento da extensão Waseller:
 uma barra de ferramentas dentro do WhatsApp Web com CRM, respostas rápidas,
@@ -7,17 +7,17 @@ agendamentos, robô, envio em massa e mais. Tudo fica salvo no seu navegador
 
 ## Como instalar (5 minutos)
 
-1. Baixe o arquivo `fluxo-zap.zip` e descompacte numa pasta.
+1. Baixe o arquivo `beco-wppseller.zip` e descompacte numa pasta.
 2. No Chrome, abra `chrome://extensions`.
 3. Ligue o **Modo do desenvolvedor** (canto superior direito).
 4. Clique em **Carregar sem compactação** e escolha a pasta descompactada (a que tem o `manifest.json`).
-5. Clique no ícone verde do Fluxo Zap: o WhatsApp Web abre com a barra de ícones na direita.
+5. Clique no ícone do Beco WppSeller (chapéu dourado): o WhatsApp Web abre com a barra de ícones na direita.
 
 > Se você tiver a Waseller instalada, desative-a antes, porque as duas mexem no WhatsApp Web ao mesmo tempo.
 
 ## O que a extensão faz
 
-| Ícone | Módulo | O que faz |
+| Ícone (barra) | Módulo | O que faz |
 |---|---|---|
 | 🏠 | Meu dia | Clientes esperando sua resposta (com contador no ícone), tarefas de hoje (lembretes, follow-ups, agendamentos) com "Feito" e "Adiar 1h", leads parados há X dias, aniversariantes com "Enviar parabéns", meta do mês com quanto falta por dia e campo para chamar um número não salvo. |
 | 📦 | Catálogo | Produtos com foto, preço, código e estoque. Envie com 1 clique e use no orçamento. |
@@ -49,7 +49,8 @@ Para variar o texto use `{Oi|Olá|E aí}`.
 - `content/bridge-main.js` + `lib/wppconnect-wa.js`: conversa com o WhatsApp Web usando a biblioteca open source [WA-JS](https://github.com/wppconnect-team/wa-js) (licença Apache-2.0), empacotada junto, sem código remoto.
 - `content/app.js`: a barra lateral e todos os módulos.
 - `pages/`: CRM completo, editor de fluxos e painel.
-- `shared/config.js`: nome, cor e dados padrão (para trocar a marca, mude aqui e os ícones em `icons/`).
+- `shared/config.js`: nome, cor e dados padrão. A marca usa a logo do Beco Diagonal (`icons/logo-beco.svg`, `icons/marca.svg`) e os ícones do app são gerados a partir de `icons/icone.svg`.
+- `shared/icons.js`: ícones em linha da barra lateral ([Lucide](https://lucide.dev), licença ISC).
 
 ## O que ficou de fora (dependia dos servidores da Wascript)
 

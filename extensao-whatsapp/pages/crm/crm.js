@@ -116,7 +116,7 @@
     for (const c of crm.cards) {
       lines.push([c.nome, c.telefone, crm.etapas.find((e) => e.id === c.etapaId)?.nome, c.valor, (c.etiquetas || []).join(', '), c.observacao, c.criadoEm].map(esc).join(';'));
     }
-    const a = h('a', { href: URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' })), download: 'crm-fluxo-zap.csv' });
+    const a = h('a', { href: URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' })), download: 'crm-beco-wppseller.csv' });
     a.click();
   }
 

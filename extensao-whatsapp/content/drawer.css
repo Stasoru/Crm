@@ -1,7 +1,11 @@
-/* Interface do Fluxo Zap (dentro do Shadow DOM) */
+/* Interface do Beco WppSeller (dentro do Shadow DOM) - cores da marca Beco Diagonal */
 :host {
-  --fz-primary: #10a37f;
-  --fz-primary-dark: #0b7d61;
+  --fz-primary: #EFA528;
+  --fz-primary-dark: #c9861a;
+  --fz-primary-ink: #a86a0a;       /* dourado escuro para texto sobre fundo claro */
+  --fz-on-primary: #1a1206;        /* texto sobre o dourado */
+  --fz-strip-bg: #15110b;
+  --fz-strip-ico: #c9b79a;
   --fz-bg: #ffffff;
   --fz-bg2: #f4f6f8;
   --fz-text: #111b21;
@@ -22,6 +26,7 @@
     --fz-text: #e9edef;
     --fz-muted: #8696a0;
     --fz-border: #2a3942;
+    --fz-primary-ink: #EFA528;
   }
 }
 
@@ -36,19 +41,28 @@
 
 .fz-strip {
   position: fixed; top: 0; right: 0; bottom: 0; width: 52px; z-index: 2147483000;
-  background: var(--fz-bg); border-left: 1px solid var(--fz-border);
+  background: var(--fz-strip-bg); border-left: 1px solid rgba(239, 165, 40, .18);
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; overflow-y: auto;
 }
-.fz-logo {
-  width: 36px; height: 36px; border-radius: 10px; background: var(--fz-primary); color: #fff;
-  display: grid; place-items: center; font-weight: 800; font-size: 13px; margin-bottom: 8px;
-}
+.fz-logo { width: 38px; height: 38px; margin: 2px 0 10px; display: block; cursor: pointer; }
+.fz-logo img { width: 100%; height: 100%; display: block; }
+.fz-sep { width: 26px; height: 1px; background: rgba(239, 165, 40, .2); margin: 4px 0; flex-shrink: 0; }
 .fz-ico {
-  position: relative; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent;
-  font-size: 19px; cursor: pointer; flex-shrink: 0;
+  position: relative; width: 40px; height: 38px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--fz-strip-ico); cursor: pointer; flex-shrink: 0; display: grid; place-items: center;
+  transition: background .15s, color .15s;
 }
-.fz-ico:hover { background: var(--fz-bg2); }
-.fz-ico.active { background: var(--fz-primary); }
+.fz-ico:hover { background: rgba(239, 165, 40, .14); color: var(--fz-primary); }
+.fz-ico.active { background: var(--fz-primary); color: var(--fz-on-primary); }
+.fz-tip {
+  position: fixed; right: 60px; transform: translateY(-50%); white-space: nowrap; pointer-events: none; display: none; z-index: 2147483001;
+  background: var(--fz-strip-bg); color: #f4e6cc; border: 1px solid rgba(239, 165, 40, .35); border-radius: 6px;
+  padding: 5px 10px; font: 600 12px "Segoe UI", Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+}
+.fz-svg { display: block; flex-shrink: 0; }
+.fz-btn .fz-svg, .fz-chip .fz-svg { display: inline-block; vertical-align: -3px; margin-right: 6px; }
+.fz-drawer-head strong { display: flex; align-items: center; gap: 8px; }
+.fz-drawer-head strong .fz-svg { color: var(--fz-primary-ink); }
 .fz-badge {
   position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
   background: var(--fz-danger); color: #fff; font-size: 10px; line-height: 16px; display: none;
@@ -80,7 +94,7 @@
 }
 .fz-btn:hover { filter: brightness(0.96); }
 .fz-btn-sm { padding: 4px 9px; font-size: 12px; }
-.fz-btn-primary { background: var(--fz-primary); border-color: var(--fz-primary); color: #fff; }
+.fz-btn-primary { background: var(--fz-primary); border-color: var(--fz-primary); color: var(--fz-on-primary); }
 .fz-btn-danger { color: var(--fz-danger); }
 .fz-btn-primary.fz-btn-danger { background: var(--fz-danger); border-color: var(--fz-danger); color: #fff; }
 .fz-link { border: 0; background: transparent; color: var(--fz-muted); font-weight: 400; text-decoration: underline; }
@@ -110,7 +124,7 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
 .fz-help { color: var(--fz-muted); display: block; margin: 6px 0; font-size: 12px; }
 .fz-empty { color: var(--fz-muted); text-align: center; padding: 18px 6px; }
 
-.fz-tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; color: #fff; background: var(--fz-primary); }
+.fz-tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; color: #fff; background: var(--fz-primary-dark); }
 .fz-tag-ghost { background: var(--fz-bg2); color: var(--fz-muted); }
 .fz-tag-pendente { background: #3b82f6; }
 .fz-tag-enviado { background: #10b981; }
@@ -119,10 +133,10 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
 
 .fz-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
 .fz-chip { border: 1px solid var(--fz-border); background: var(--fz-bg); color: var(--fz-text); border-radius: 14px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 12px; }
-.fz-chip.active { background: var(--fz-primary); color: #fff; border-color: var(--fz-primary); }
+.fz-chip.active { background: var(--fz-primary); color: var(--fz-on-primary); border-color: var(--fz-primary); }
 
 .fz-contact { display: flex; gap: 10px; align-items: center; padding: 4px 0 8px; }
-.fz-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--fz-primary); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 18px; }
+.fz-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--fz-strip-bg); color: var(--fz-primary); display: grid; place-items: center; font-weight: 700; font-size: 18px; }
 .fz-note { position: relative; background: #fff8c5; color: #3d3a1c; border-radius: 8px; padding: 6px 26px 6px 8px; margin: 6px 0; white-space: pre-wrap; }
 .fz-note .fz-x { position: absolute; top: 2px; right: 2px; }
 
@@ -158,7 +172,7 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
 .fz-toast { display: flex; align-items: center; gap: 8px; min-width: 220px; max-width: 380px; padding: 10px 12px; border-radius: 10px; color: #fff; background: #334155; box-shadow: 0 8px 20px rgba(0,0,0,.2); }
 .fz-toast-msg { flex: 1; }
 .fz-toast .fz-x { color: #fff; }
-.fz-toast-ok { background: var(--fz-primary); }
+.fz-toast-ok { background: #1f6f4a; }
 .fz-toast-error { background: var(--fz-danger); }
 .fz-toast-warn { background: #b45309; }
 
@@ -166,18 +180,18 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
 .fz-muted { color: var(--fz-muted); }
 .fz-1line { white-space: nowrap; text-overflow: ellipsis; max-height: none; }
 .fz-star { border: 0; background: transparent; cursor: pointer; font-size: 16px; color: var(--fz-muted); padding: 0 2px; line-height: 1; }
-.fz-star.on { color: #f5b301; }
+.fz-star.on { color: var(--fz-primary); }
 .fz-chip-sm { font-size: 11px; padding: 2px 8px; }
 .fz-meta b { font-size: 18px; }
 .fz-prod { display: flex; gap: 10px; align-items: flex-start; }
 .fz-thumb { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--fz-bg2); display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
-.fz-price { color: var(--fz-primary); font-weight: 700; }
+.fz-price { color: var(--fz-primary-ink); font-weight: 700; }
 .fz-orc { max-height: 260px; overflow-y: auto; border: 1px solid var(--fz-border); border-radius: 8px; padding: 4px 8px; margin: 6px 0; }
 .fz-orc-row { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--fz-border); }
 .fz-orc-row:last-child { border-bottom: 0; }
 .fz-orc-row small { color: var(--fz-muted); }
 .fz-total { margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--fz-bg2); }
-.fz-total b { color: var(--fz-primary); font-size: 15px; }
+.fz-total b { color: var(--fz-primary-ink); font-size: 15px; }
 .fz-favbar {
   position: fixed; z-index: 2147482990; display: none; gap: 6px; padding: 4px 10px; overflow-x: auto;
   font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; scrollbar-width: thin;
@@ -186,4 +200,5 @@ textarea.fz-input, .fz-field textarea { resize: vertical; }
   flex-shrink: 0; border: 1px solid var(--fz-border); background: var(--fz-bg); color: var(--fz-text); border-radius: 14px;
   padding: 4px 12px; cursor: pointer; font: inherit; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12);
 }
-.fz-fav:hover { border-color: var(--fz-primary); color: var(--fz-primary); }
+.fz-fav:hover { border-color: var(--fz-primary); color: var(--fz-primary-ink); }
+.fz-task-ico { color: var(--fz-primary-ink); display: inline-flex; }

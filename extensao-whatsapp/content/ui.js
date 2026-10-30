@@ -27,7 +27,7 @@
 
   function mount() {
     if (root) return root;
-    const host = h('div', { id: 'fluxo-zap-root' });
+    const host = h('div', { id: 'beco-wppseller-root' });
     document.body.append(host);
     root = host.attachShadow({ mode: 'open' });
     root.append(h('link', { rel: 'stylesheet', href: chrome.runtime.getURL('content/drawer.css') }));

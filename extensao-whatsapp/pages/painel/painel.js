@@ -139,7 +139,7 @@
       h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: !!d.sendAfterWhatsAppOpens, onchange: (e) => S.set('sendAfterWhatsAppOpens', e.target.checked) }), ' Enviar agendamentos atrasados quando o WhatsApp for aberto'),
       h('div', { class: 'row', style: { marginTop: '12px' } },
         h('button', { class: 'btn danger', onclick: async () => {
-          if (!(await confirm('Apagar TODOS os dados do Fluxo Zap neste navegador? Faça um backup antes.', 'Apagar tudo'))) return;
+          if (!(await confirm('Apagar TODOS os dados do Beco WppSeller neste navegador? Faça um backup antes.', 'Apagar tudo'))) return;
           await chrome.storage.local.clear();
           await S.ensureDefaults();
           toast('Dados apagados.', 'ok');

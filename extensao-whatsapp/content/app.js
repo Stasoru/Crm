@@ -1,5 +1,5 @@
 /*
-  Fluxo Zap - aplicação principal dentro do WhatsApp Web.
+  Beco WppSeller - aplicação principal dentro do WhatsApp Web.
 
   Monta a barra lateral com os módulos e executa as rotinas que os alarmes
   do service worker pedem (agendamentos, status, follow-up, lembretes).
@@ -102,7 +102,18 @@
   const empty = (txt) => h('div', { class: 'fz-empty' }, txt);
   const section = (title, ...kids) => h('div', { class: 'fz-section' }, h('div', { class: 'fz-section-title' }, title), kids);
   const row = (...kids) => h('div', { class: 'fz-row' }, kids);
-  const btn = (label, onclick, cls = '') => h('button', { class: 'fz-btn ' + cls, onclick }, label);
+  // Botões cujo texto começa com um destes emojis ganham o ícone em linha correspondente
+  const BTN_ICONS = {
+    '🧾': 'receipt-text', '💲': 'qr-code', '📦': 'package', '✍️': 'wand-sparkles', '📝': 'file-text', '⏰': 'calendar-clock',
+    '🔔': 'bell', '🔁': 'repeat', '🛒': 'shopping-cart', '🧩': 'workflow', '📌': 'pin', '📁': 'folder-plus', '✨': 'sparkles', '🎙️': 'mic'
+  };
+  function btn(label, onclick, cls = '') {
+    if (typeof label === 'string') {
+      const emo = Object.keys(BTN_ICONS).find((e) => label.startsWith(e + ' '));
+      if (emo) return h('button', { class: 'fz-btn ' + cls, onclick }, FZ_ICON(BTN_ICONS[emo], 15), label.slice(emo.length + 1));
+    }
+    return h('button', { class: 'fz-btn ' + cls, onclick }, label);
+  }
 
   async function getVendas() {
     return { ...FZ_CONFIG.DEFAULTS.vendas, ...(await S.get('vendas')) };
@@ -174,7 +185,7 @@
   async function refresh() {
     const m = MODULES.find((x) => x.id === state.panel);
     if (!m) return;
-    drawerTitle.textContent = m.title;
+    drawerTitle.replaceChildren(FZ_ICON(m.icon, 18), m.title);
     const scroll = drawerBody.scrollTop;
     const body = h('div', {});
     // Aceita listas e ignora valores vazios, como o h()
@@ -192,7 +203,7 @@
 
   /* ============================================================ hoje */
 
-  reg('hoje', '🏠', 'Meu dia', async (el) => {
+  reg('hoje', 'house', 'Meu dia', async (el) => {
     const v = await getVendas();
     const { notifications, FollowUp, agendamentos, crm, contatos } = await S.getMany(['notifications', 'FollowUp', 'agendamentos', 'crm', 'contatos']);
     const hoje = new Date().toISOString().slice(0, 10);
@@ -243,7 +254,7 @@
     const fus = FollowUp.filter((f) => f.status === 'pendente' && new Date(f.dueAt) <= fimDoDia);
     const ags = agendamentos.filter((a) => a.status === 'pendente' && new Date(a.quando) <= fimDoDia);
     const tarefa = (icon, titulo, sub, chatId, extra) => h('div', { class: 'fz-card' + (chatId ? ' fz-click' : ''), onclick: () => abrir(chatId) },
-      h('div', { class: 'fz-card-head' }, icon, ' ', h('b', {}, titulo)), sub ? h('small', {}, sub) : null, extra);
+      h('div', { class: 'fz-card-head' }, h('span', { class: 'fz-task-ico' }, FZ_ICON({ '🔔': 'bell', '🔁': 'repeat', '⏰': 'calendar-clock', '🧊': 'snowflake', '🎉': 'cake' }[icon] || 'clipboard-list', 15)), h('b', {}, titulo)), sub ? h('small', {}, sub) : null, extra);
     el.append(section(`Tarefas de hoje (${lembretes.length + fus.length + ags.length})`,
       lembretes.map((n) => tarefa('🔔', n.titulo, `${n.time}${n.nome ? ' · ' + n.nome : ''}`, n.chatId,
         row(btn('Feito', async (e) => { e.stopPropagation(); await bg('READ_NOTIFICATION', { id: n.id }); refresh(); }, 'fz-btn-sm'),
@@ -268,7 +279,7 @@
     const md = hoje.slice(5);
     const aniv = contatos.filter((c) => c.aniversario && c.aniversario.slice(5) === md);
     if (aniv.length) {
-      el.append(section('🎂 Aniversariantes de hoje', aniv.map((c) => tarefa('🎉', c.nome || U.formatPhone(c.telefone), '', c.chatId,
+      el.append(section('Aniversariantes de hoje', aniv.map((c) => tarefa('🎉', c.nome || U.formatPhone(c.telefone), '', c.chatId,
         row(btn('Enviar parabéns', async (e) => {
           e.stopPropagation();
           try { await sendContent(c.chatId, { texto: 'Feliz aniversário, {primeiro_nome}! 🎉 Muita saúde e alegria. Preparei uma condição especial pra você hoje, quer saber?' }, await ctxOf(c.chatId, c.nome), 'manual'); toast('Parabéns enviado!', 'ok'); } catch (err) { toast(err.message, 'error'); }
@@ -276,7 +287,7 @@
     }
   });
 
-  reg('respostas', '💬', 'Respostas rápidas', async (el) => {
+  reg('respostas', 'message-square-text', 'Respostas rápidas', async (el) => {
     const { respostasRapidas: list, categoria: cats } = await S.getMany(['respostasRapidas', 'categoria']);
     let filtro = state.respFiltro || '';
     let cat = state.respCat || '';
@@ -376,7 +387,7 @@
 
   /* ========================================================= contato */
 
-  reg('contato', '👤', 'Conversa atual', async (el) => {
+  reg('contato', 'user-round', 'Conversa atual', async (el) => {
     const chat = await currentChat();
     if (!chat) { el.append(empty('Abra uma conversa para ver o CRM, notas e ações do contato.')); return; }
     const { crm, notes, contatos, encomendas, pinChat, FollowUp } = await S.getMany(['crm', 'notes', 'contatos', 'encomendas', 'pinChat', 'FollowUp']);
@@ -648,7 +659,7 @@
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  reg('catalogo', '📦', 'Catálogo de produtos', async (el) => {
+  reg('catalogo', 'package', 'Catálogo de produtos', async (el) => {
     const produtos = await S.get('produtos');
     let q = state.catBusca || '';
     const box = h('div', {});
@@ -772,7 +783,7 @@
 
   /* ============================================================== CRM */
 
-  reg('crm', '📊', 'Funil de vendas (CRM)', async (el) => {
+  reg('crm', 'square-kanban', 'Funil de vendas (CRM)', async (el) => {
     const crm = await S.get('crm');
     el.append(row(btn('Abrir CRM completo', () => bg('CRM'), 'fz-btn-primary'), btn('+ Conversa atual', () => openPanel('contato'))));
     for (const e of crm.etapas) {
@@ -813,7 +824,7 @@
     refresh();
   }
 
-  reg('agenda', '⏰', 'Agendamentos', async (el) => {
+  reg('agenda', 'calendar-clock', 'Agendamentos', async (el) => {
     const { agendamentos: list, agendamentosNaoDisparados: perdidos, sendAfterWhatsAppOpens } =
       await S.getMany(['agendamentos', 'agendamentosNaoDisparados', 'sendAfterWhatsAppOpens']);
     const pend = list.filter((a) => a.status === 'pendente').sort((a, b) => a.quando.localeCompare(b.quando));
@@ -910,7 +921,7 @@
     refresh();
   }
 
-  reg('lembretes', '🔔', 'Lembretes', async (el) => {
+  reg('lembretes', 'bell', 'Lembretes', async (el) => {
     const { notifications: list, useNotification } = await S.getMany(['notifications', 'useNotification']);
     const ord = list.slice().sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
     el.append(
@@ -941,7 +952,7 @@
     }).filter((c) => c.telefone.length >= 12 && !vistos.has(c.telefone) && vistos.add(c.telefone));
   }
 
-  reg('massa', '📢', 'Envio em massa', async (el) => {
+  reg('massa', 'megaphone', 'Envio em massa', async (el) => {
     const { agrupamentos, respostasRapidas, crm } = await S.getMany(['agrupamentos', 'respostasRapidas', 'crm']);
     const numeros = h('textarea', { class: 'fz-input', rows: 6, placeholder: '5511999999999;Maria\n5521988888888;João' });
     numeros.value = state.massaNumeros || '';
@@ -1032,7 +1043,7 @@
 
   /* ============================================== robô (autoatendimento) */
 
-  reg('robo', '🤖', 'Robô de atendimento', async (el) => {
+  reg('robo', 'bot', 'Robô de atendimento', async (el) => {
     const { autoatendimento: cfg, respostasRapidas, fluxo } = await S.getMany(['autoatendimento', 'respostasRapidas', 'fluxo']);
     el.append(
       h('label', { class: 'fz-switch' }, h('input', { type: 'checkbox', checked: !!cfg.ativo, onchange: async (e) => { await S.update('autoatendimento', (c) => { c.ativo = e.target.checked; return c; }); toast(e.target.checked ? 'Robô ligado.' : 'Robô desligado.', 'ok'); } }), ' Robô ligado'),
@@ -1112,7 +1123,7 @@
         else if (r.respostaId) await sendQuickReply(msg.chatId, r.respostaId, ctx, 'robo');
         if (r.resposta && r.resposta.trim()) await sendContent(msg.chatId, { texto: r.resposta }, ctx, 'robo');
       } catch (e) {
-        console.warn('[Fluxo Zap] Robô falhou', e);
+        console.warn('[Beco WppSeller] Robô falhou', e);
       }
       break; // apenas a primeira regra que casar
     }
@@ -1138,7 +1149,7 @@
     refresh();
   }
 
-  reg('followup', '🔁', 'Follow-up', async (el) => {
+  reg('followup', 'repeat', 'Follow-up', async (el) => {
     const list = (await S.get('FollowUp')).slice().sort((a, b) => a.dueAt.localeCompare(b.dueAt));
     el.append(
       row(btn('+ Follow-up para conversa atual', async () => { const c = await requireChat(); if (c) novoFollowUp(c); }, 'fz-btn-primary')),
@@ -1186,7 +1197,7 @@
     try { await runFlow(chat.id, v.id, await ctxOf(chat.id, chat.nome)); toast('Fluxo executado.', 'ok'); } catch (e) { toast(e.message, 'error'); }
   }
 
-  reg('fluxos', '🧩', 'Fluxos', async (el) => {
+  reg('fluxos', 'workflow', 'Fluxos', async (el) => {
     const fluxo = await S.get('fluxo');
     el.append(
       row(btn('Abrir editor de fluxos', () => bg('FLOW'), 'fz-btn-primary')),
@@ -1252,7 +1263,7 @@
     }
   }
 
-  reg('pedidos', '🛒', 'Pedidos', async (el) => {
+  reg('pedidos', 'shopping-cart', 'Pedidos', async (el) => {
     const list = await S.get('encomendas');
     const filtro = state.pedFiltro || '';
     const itens = list.filter((p) => !filtro || p.status === filtro).sort((a, b) => b.data.localeCompare(a.data));
@@ -1279,7 +1290,7 @@
 
   /* ============================================================= status */
 
-  reg('status', '📸', 'Status agendado', async (el) => {
+  reg('status', 'circle-dashed', 'Status agendado', async (el) => {
     const list = (await S.get('status')).slice().sort((a, b) => b.quando.localeCompare(a.quando));
     el.append(
       row(btn('+ Novo status', async () => {
@@ -1329,7 +1340,7 @@
 
   /* ===================================================== abas e fixados */
 
-  reg('abas', '📁', 'Abas e fixados', async (el) => {
+  reg('abas', 'folder', 'Abas e fixados', async (el) => {
     const { pinChat, userTabs } = await S.getMany(['pinChat', 'userTabs']);
     const chatRow = (c, onRemove) => h('div', { class: 'fz-card fz-click fz-card-row', onclick: () => WA.call('openChat', c.id) },
       h('span', {}, c.nome || U.formatPhone(U.phoneFromChatId(c.id))),
@@ -1349,7 +1360,7 @@
 
   /* ============================================================ atalhos */
 
-  reg('atalhos', '⌨️', 'Atalhos de texto', async (el) => {
+  reg('atalhos', 'keyboard', 'Atalhos de texto', async (el) => {
     const cfg = await S.get('replacementStorage');
     el.append(
       h('label', { class: 'fz-switch' }, h('input', { type: 'checkbox', checked: cfg.isEnabled, onchange: async (e) => { await S.update('replacementStorage', (c) => { c.isEnabled = e.target.checked; return c; }); } }), ' Atalhos ligados'),
@@ -1394,7 +1405,7 @@
 
   /* ========================================================== relatório */
 
-  reg('relatorio', '📈', 'Relatório', async (el) => {
+  reg('relatorio', 'chart-column', 'Relatório', async (el) => {
     const { relatorio: rel, crm, encomendas } = await S.getMany(['relatorio', 'crm', 'encomendas']);
     const hoje = new Date().toISOString().slice(0, 10);
     const sete = Date.now() - 7 * 86400000;
@@ -1420,7 +1431,7 @@
       row(btn('Zerar relatório', async () => { if (await confirm('Apagar o histórico do relatório?')) { await S.set('relatorio', []); refresh(); } }, 'fz-btn-sm')));
   });
 
-  reg('painel', '⚙️', 'Configurações', async (el) => {
+  reg('painel', 'settings', 'Configurações', async (el) => {
     const at = await S.get('atendimento');
     el.append(
       row(btn('Abrir painel de configurações', () => bg('PAINEL'), 'fz-btn-primary')),
@@ -1431,11 +1442,29 @@
 
   /* ======================================================= barra lateral */
 
-  strip.append(h('div', { class: 'fz-logo', title: BRAND.name }, 'FZ'));
-  for (const m of MODULES) {
-    strip.append(h('button', { class: 'fz-ico', 'data-id': m.id, title: m.title, onclick: () => openPanel(m.id) }, m.icon,
-      h('span', { class: 'fz-badge', id: 'fz-badge-' + m.id })));
-  }
+  strip.append(h('div', { class: 'fz-logo', title: BRAND.name, onclick: () => openPanel('hoje') }, h('img', { src: chrome.runtime.getURL('icons/icon48.png'), alt: BRAND.name })));
+  // Grupos: dia a dia | conversa e vendas | automações | organização | configurações
+  const GRUPOS = [['hoje', 'respostas', 'contato'], ['catalogo', 'crm', 'pedidos'], ['agenda', 'lembretes', 'followup', 'massa', 'robo', 'fluxos', 'status'], ['abas', 'atalhos', 'relatorio'], ['painel']];
+  GRUPOS.forEach((ids, gi) => {
+    if (gi) strip.append(h('div', { class: 'fz-sep' }));
+    for (const id of ids) {
+      const m = MODULES.find((x) => x.id === id);
+      strip.append(h('button', { class: 'fz-ico', 'data-id': m.id, 'aria-label': m.title, onclick: () => openPanel(m.id) },
+        FZ_ICON(m.icon, 20), h('span', { class: 'fz-badge', id: 'fz-badge-' + m.id })));
+    }
+  });
+
+  // Dica com o nome do módulo ao passar o mouse (fora da barra, para não ser cortada)
+  const tip = h('div', { class: 'fz-tip' });
+  root.append(tip);
+  strip.addEventListener('mouseover', (e) => {
+    const b = e.target.closest?.('.fz-ico');
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    tip.textContent = MODULES.find((x) => x.id === b.dataset.id)?.title || '';
+    Object.assign(tip.style, { top: (r.top + r.height / 2) + 'px', display: 'block' });
+  });
+  strip.addEventListener('mouseout', (e) => { if (!e.relatedTarget?.closest?.('.fz-ico')) tip.style.display = 'none'; });
 
   /* ============ barra de respostas favoritas acima da caixa de mensagem */
 

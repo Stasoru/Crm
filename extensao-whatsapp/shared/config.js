@@ -4,10 +4,10 @@
 */
 (function (g) {
   const BRAND = {
-    name: 'Fluxo Zap',
-    primary: '#10a37f',
-    primaryText: '#ffffff',
-    version: '1.1.0'
+    name: 'Beco WppSeller',
+    primary: '#EFA528',
+    primaryText: '#1a1206',
+    version: '1.2.0'
   };
 
   const WHATSAPP_URL = 'https://web.whatsapp.com/*';
